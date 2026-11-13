@@ -278,66 +278,45 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
   const ending=inv.filter(x=>x.daysLeft!=null&&x.daysLeft<=90), R=Store.coll('requirements').filter(r=>inv.some(x=>x.k.id===r.contractId)), rq=reqStats(R);
   const obs=obsStats(Store.coll('observations').filter(o=>omContracts().some(k=>k.id===o.contractId)));
   const share=x=>PM.profit>0?`يساهم بـ${per(x,PM.profit)}% من ربح المحفظة`:'';
+  const occP=pct(PM.occ,PM.units), big=(l,val,cls,word,note)=>`<div class="dk"><div class="l">${l}</div><div class="v">${val}</div><span class="pill ${cls}">${word}</span><div class="s">${note}</div></div>`;
+  const eq=(l,val,dot,cls='')=>`<div class="de ${cls}"><span>${dot?`<i class="${dot}"></i>`:''}${l}</span><b>${val}</b></div>`;
   v.innerHTML=`
+  <div class="dtier">الأساسي</div>
   <section class="dhero mb">
-    <div class="dh-top">
-      <div class="dh-main">
-        <div class="dh-eye">الملخص التنفيذي · ${esc(Store.data.settings.projectName)} · <span class="num">${todayStr()}</span></div>
-        <div class="dh-lbl">صافي الربح السنوي بعد سداد الهيئة الملكية</div>
-        <div class="dh-big ${PM.profit<0?'neg':''}">${short(PM.profit)} <small>ر.س</small></div>
-        <p class="dh-say">${esc(verdict)}</p>
-      </div>
-      <div class="dh-side">
-        <div class="dring" title="متوسط مؤشر صحة الاتفاقيات"><svg viewBox="0 0 84 84" width="104" height="104" aria-hidden="true"><circle cx="42" cy="42" r="34" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="7"/><circle cx="42" cy="42" r="34" fill="none" stroke="${grade[1]}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${(score/100*213.6).toFixed(1)} 213.6" transform="rotate(-90 42 42)"/></svg><div><b>${score}</b><small>من 100</small></div></div>
-        <div class="dh-sl">صحة المحفظة: <b style="color:${grade[1]}">${grade[0]}</b><br><span>${agN(all.length)}: ${self.length} تشغيل ذاتي و${inv.length} إسناد</span></div>
-        <a class="dh-al ${bad?'bad':''}" href="#alerts">🔔 ${alerts.length} تنبيه${bad?` · ${bad} حرجة`:''}</a>
-      </div>
+    <div class="dh-top"><div class="dh-eye">${esc(Store.data.settings.projectName)} · <span class="num">${todayStr()}</span></div><a class="dh-al ${bad?'bad':''}" href="#alerts">🔔 ${alerts.length} تنبيه${bad?` · ${bad} حرجة`:''}</a></div>
+    <p class="dh-say">${esc(verdict)}</p>
+    <div class="deq">
+      ${eq('الدخل السنوي',short(gross))}<em>−</em>${eq('تكاليف التشغيل',short(S('exp')),'c')}<em>−</em>${eq('ندفع للهيئة الملكية',short(PM.pay),'a')}<em>=</em>${eq('صافي الربح',short(PM.profit),'p','res'+(PM.profit<0?' neg':''))}
     </div>
-    <div class="dh-flow">
-      <div class="dh-fh"><span>أين يذهب كل ريال من الدخل</span><b>إجمالي الدخل السنوي ${short(gross)}</b></div>
-      ${gross?flow(gross,S('exp'),PM.pay,PM.profit)+leg(gross,S('exp'),PM.pay,PM.profit):'<div class="dh-eye">لا يوجد دخل مسجل بعد.</div>'}
-    </div>
+    ${gross?flow(gross,S('exp'),PM.pay,PM.profit)+`<div class="dh-eye">من كل 100 ريال دخل: ${per(S('exp'))} تكاليف تشغيل، ${per(PM.pay)} للهيئة الملكية، و${PM.profit<0?'لا يبقى ربح':per(PM.profit)+' تبقى ربحاً'}.</div>`:''}
   </section>
 
-  <div class="card mb ddec"><h3>يحتاج قرارك <span class="small muted">مرتّبة حسب المبلغ المتأثر</span></h3>
-    ${D.length?D.slice(0,5).map((d,i)=>`<a class="drow ${d.tone}" href="${d.go}"><span class="dn">${i+1}</span><div class="dt"><b>${esc(d.t)}</b>${d.s?`<div class="small muted">${esc(d.s)}</div>`:''}</div>${d.amt?`<div class="damt"><b>${short(d.amt)}</b><small>${d.u}</small></div>`:'<div class="damt"><small>دقة البيانات</small></div>'}<span class="dgo">←</span></a>`).join(''):'<div class="empty">لا شيء عاجل اليوم. كل الاتفاقيات ضمن الحدود.</div>'}
-    ${D.length>5?`<a class="small" href="#alerts" style="display:inline-block;margin-top:8px">${D.length===6?'وبند آخر':`و${D.length-5} بنود أخرى`} في التنبيهات</a>`:''}
+  <div class="dtier">المهم</div>
+  <div class="card mb ddec"><h3>يحتاج قرارك</h3>
+    ${D.length?D.slice(0,3).map((d,i)=>`<a class="drow ${d.tone}" href="${d.go}"><span class="dn">${i+1}</span><div class="dt"><b>${esc(d.t)}</b>${d.s?`<div class="small muted">${esc(d.s)}</div>`:''}</div>${d.amt?`<div class="damt"><b>${short(d.amt)}</b><small>${d.u}</small></div>`:'<div class="damt"><small>دقة البيانات</small></div>'}<span class="dgo">←</span></a>`).join(''):'<div class="empty">لا شيء عاجل اليوم.</div>'}
+    ${D.length>3?`<a class="small" href="#alerts" style="display:inline-block;margin-top:10px">عرض ${D.length-3} بنود أخرى</a>`:''}
   </div>
-
-  <div class="card mb dvit">
-    ${vit('تغطية التزام الهيئة الملكية',PM.pay?`${PM.coverage.toFixed(2)} مرة`:'—',PM.pay?cC:'warn',PM.pay?(cC==='ok'?'مريحة':cC==='warn'?'مقبولة':'ضيقة'):'غير محدد',PM.coverage/2.5*100,60,'الدخل التشغيلي ÷ ما ندفعه للهيئة. المريح 1.5 مرة فأكثر.')}
-    ${vit('الإشغال الاقتصادي',`${occE}%`,oC,oC==='ok'?'ممتاز':oC==='warn'?'متوسط':'ضعيف',occE,90,`${PM.occ} من ${PM.units} وحدة مؤجرة. الهدف 90%.`)}
-    ${vit('نسبة التحصيل',`${col}%`,lC,lC==='ok'?'ممتازة':lC==='warn'?'مقبولة':'ضعيفة',col,95,`حُصّل ${short(PM.duePaid)} من ${short(PM.dueAmt)} مستحق. الهدف 95%.`)}
-    ${vit('متوسط المدة المتبقية للعقود',`${PM.wale.toFixed(1)} سنة`,wC,wC==='ok'?'مريحة':wC==='warn'?'قصيرة':'قصيرة جداً',PM.wale/5*100,40,'مرجّحة بالدخل. أقل من سنتين يعني مخاطر تجديد قريبة.')}
-  </div>
-
   <div class="grid g2 mb">
-    <a class="card dmod self" href="#operations">
-      <div class="dmh"><h3>🏠 التشغيل الذاتي</h3><span class="small muted">${agN(self.length)}${share(S('profit'))?' · '+share(S('profit')):''}</span></div>
-      <div class="dm3"><div><span>الدخل</span><b>${short(S('rev'))}</b></div><div><span>الربح</span><b class="${S('profit')<0?'neg':''}">${short(S('profit'))}</b></div><div><span>الهامش</span><b>${pct(S('profit'),S('rev'))}%</b></div></div>
-      ${S('rev')?flow(S('rev'),S('exp'),S('pay'),S('profit')):''}
-      <div class="dchips"><span>الإشغال <b>${pct(S('occ'),S('units'))}%</b> (${S('occ')} من ${S('units')})</span><span class="${S('overdue')?'bad':''}">متأخرات التحصيل <b>${short(S('overdue'))}</b></span><span class="${obs.open?'warn':''}">ملاحظات مقاولين مفتوحة <b>${obs.open}</b></span></div>
-    </a>
-    <a class="card dmod inv" href="#investor">
-      <div class="dmh"><h3>🤝 إسناد التشغيل لمستثمر</h3><span class="small muted">${agN(inv.length)}${share(I('profit'))?' · '+share(I('profit')):''}</span></div>
-      <div class="dm3"><div><span>يدفع لنا المستثمرون</span><b>${short(I('due'))}</b></div><div><span>الربح</span><b class="${I('profit')<0?'neg':''}">${short(I('profit'))}</b></div><div><span>الهامش</span><b>${pct(I('profit'),I('due'))}%</b></div></div>
-      ${I('due')?flow(I('due'),0,I('pay'),I('profit')):''}
-      <div class="dchips"><span>المحصّل فعلياً <b>${pct(I('rev'),I('due'))}%</b></span><span class="${ending.length?'bad':''}">عقود تنتهي خلال 90 يوماً <b>${ending.length}</b></span><span class="${rq.late?'warn':''}">متطلبات منجزة <b>${rq.done} من ${rq.total}</b></span></div>
-    </a>
+    <a class="card dmod self" href="#operations"><div class="dmh"><h3>🏠 التشغيل الذاتي</h3><span class="small muted">${agN(self.length)}</span></div>
+      <div class="dmp"><span>ربحه السنوي</span><b class="${S('profit')<0?'neg':''}">${short(S('profit'))}</b><small>من دخل ${short(S('rev'))}</small></div></a>
+    <a class="card dmod inv" href="#investor"><div class="dmh"><h3>🤝 إسناد التشغيل لمستثمر</h3><span class="small muted">${agN(inv.length)}</span></div>
+      <div class="dmp"><span>ربحه السنوي</span><b class="${I('profit')<0?'neg':''}">${short(I('profit'))}</b><small>من دخل ${short(I('due'))}</small></div></a>
+  </div>
+  <div class="card mb dkpis">
+    ${big('الوحدات المؤجرة',`${occP}%`,occP>=90?'ok':occP>=75?'warn':'bad',occP>=90?'ممتاز':occP>=75?'متوسط':'ضعيف',`${PM.occ} من ${PM.units} وحدة في التشغيل الذاتي`)}
+    ${big('التحصيل من المستأجرين',`${col}%`,lC,lC==='ok'?'ممتاز':lC==='warn'?'مقبول':'ضعيف',PM.arrears?`متأخرات ${short(PM.arrears)}`:'لا توجد متأخرات')}
+    ${big('عقود تنتهي خلال 90 يوماً',ending.length,ending.length?'bad':'ok',ending.length?'تحتاج قراراً':'لا يوجد',ending.length?ending.map(x=>esc(nm(x))).join('، '):'كل العقود سارية لأكثر من 90 يوماً')}
   </div>
 
-  <div class="card mb" style="padding:0"><div style="padding:16px 18px 4px"><h3>ترتيب الاتفاقيات حسب الربح <span class="small muted">اضغط درجة الصحة لتفاصيلها</span></h3></div>
-    <div class="twrap"><table class="tbl dlg"><thead><tr><th>الاتفاقية</th><th>النموذج</th><th>الصحة</th><th>الدخل</th><th>للهيئة الملكية</th><th>الربح</th><th>الهامش</th><th>حصتها من الدخل</th><th>تنتهي بعد</th></tr></thead><tbody>
-    ${all.slice().sort((a,b)=>b.profit-a.profit).map(x=>{ const incm=x.k.type==='مستثمر'?x.due:x.rev; return `<tr class="clk" data-go="${x.k.type==='مستثمر'?'#investor':'#operations'}"><td><b>${esc(nm(x))}</b><div class="small muted">${assetPlain(x.k.assetId)}</div></td><td>${pill(AG_LABEL[x.k.type])}</td><td>${healthBadge(x.k)}</td><td>${num(incm)}</td><td>${payCell(x)}</td><td class="${x.profit<0?'neg':''}"><b>${num(x.profit)}</b></td><td>${x.margin}%</td><td style="min-width:120px"><div class="bar gold"><i style="width:${per(incm)}%"></i></div><span class="small muted">${per(incm)}%</span></td><td>${left(x.daysLeft)}</td></tr>`; }).join('')||'<tr><td colspan="9" class="empty">لا توجد اتفاقيات تشغيلية</td></tr>'}
-    </tbody></table></div></div>
-
-  <div class="grid g2 mb">
-    <div class="card"><h3>الدخل والتكاليف شهرياً <span class="small muted">آخر 12 شهراً، والخط هو الصافي</span></h3><div class="chart"><canvas id="c1"></canvas></div></div>
-    <div class="card"><h3>التدفق النقدي المتوقع <span class="small muted">3 أشهر قادمة، تقديري</span></h3><div class="chart"><canvas id="cf"></canvas></div><div class="small muted" style="margin-top:6px">الداخل: أقساط المستأجرين ودفعات المستثمرين. الخارج: حصة شهرية للهيئة الملكية وعقود المقاولين.</div></div>
-  </div>
-
-  <details class="card" id="dMore"><summary><b>تحليلات إضافية</b> <span class="small muted">أعمار المتأخرات، انتهاء العقود، تركّز الدخل، وكل التنبيهات</span></summary>
+  <div class="dtier">تفاصيل أخرى</div>
+  <details class="card mb" id="dTbl"><summary><b>كل الاتفاقيات</b> <span class="small muted">الربح والصحة وموعد الانتهاء لكل اتفاقية</span></summary>
+    <div class="twrap" style="margin-top:12px"><table class="tbl dlg"><thead><tr><th>الاتفاقية</th><th>النموذج</th><th>الصحة</th><th>الدخل</th><th>للهيئة الملكية</th><th>الربح</th><th>تنتهي بعد</th></tr></thead><tbody>
+    ${all.slice().sort((a,b)=>b.profit-a.profit).map(x=>{ const incm=x.k.type==='مستثمر'?x.due:x.rev; return `<tr class="clk" data-go="${x.k.type==='مستثمر'?'#investor':'#operations'}"><td><b>${esc(nm(x))}</b><div class="small muted">${assetPlain(x.k.assetId)}</div></td><td>${pill(AG_LABEL[x.k.type])}</td><td>${healthBadge(x.k)}</td><td>${num(incm)}</td><td>${payCell(x)}</td><td class="${x.profit<0?'neg':''}"><b>${num(x.profit)}</b></td><td>${left(x.daysLeft)}</td></tr>`; }).join('')||'<tr><td colspan="7" class="empty">لا توجد اتفاقيات تشغيلية</td></tr>'}
+    </tbody></table></div></details>
+  <details class="card" id="dMore"><summary><b>الرسوم والتحليلات</b> <span class="small muted">الدخل الشهري، التدفق المتوقع، المتأخرات، انتهاء العقود، وكل التنبيهات</span></summary>
     <div class="grid g2" style="margin-top:14px">
+      <div><h3>الدخل والتكاليف شهرياً</h3><div class="chart"><canvas id="c1"></canvas></div></div>
+      <div><h3>التدفق النقدي المتوقع (3 أشهر)</h3><div class="chart"><canvas id="cf"></canvas></div></div>
       <div><h3>أعمار متأخرات المستأجرين</h3>${PM.arrears?`<div class="chart" style="height:220px"><canvas id="cag"></canvas></div>`:'<div class="empty">لا توجد متأخرات</div>'}</div>
       <div><h3>الدخل الذي تنتهي عقوده كل سنة</h3><div class="chart" style="height:220px"><canvas id="cex"></canvas></div></div>
       <div><h3>تركّز الدخل حسب الاتفاقية</h3><div class="chart" style="height:240px"><canvas id="ccc"></canvas></div></div>
@@ -346,9 +325,9 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
   </details>`;
   v.querySelectorAll('tr[data-go]').forEach(r=>r.onclick=()=>{ location.hash=r.dataset.go; });
   const net=months.map((_,i)=>mSelfRev[i]+mInvRev[i]-mSelfExp[i]), st={scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,ticks:{callback:x=>short(x)}}}};
-  Charts.make('c1','bar',months,[{label:'دخل التشغيل الذاتي',data:mSelfRev,color:COLORS[2],stack:'r'},{label:'دفعات المستثمرين',data:mInvRev,color:COLORS[3],stack:'r'},{label:'تكاليف التشغيل الذاتي',data:mSelfExp,color:COLORS[5],stack:'e'},{label:'الصافي',data:net,type:'line',stack:'n',color:'#b9925a',backgroundColor:'transparent',pointRadius:2,borderWidth:2.5}],st);
-  Charts.make('cf','bar',PM.cf.map(x=>x.mo),[{label:'أقساط المستأجرين',data:PM.cf.map(x=>Math.round(x.tenants)),color:COLORS[2],stack:'in'},{label:'دفعات المستثمرين',data:PM.cf.map(x=>Math.round(x.invIn)),color:COLORS[3],stack:'in'},{label:'الهيئة الملكية',data:PM.cf.map(x=>Math.round(x.auth)),color:COLORS[5],stack:'out'},{label:'المقاولون',data:PM.cf.map(x=>Math.round(x.om)),color:COLORS[1],stack:'out'}],st);
   let drawn=false; $('#dMore',v).addEventListener('toggle',e=>{ if(!e.target.open||drawn) return; drawn=true;
+    Charts.make('c1','bar',months,[{label:'دخل التشغيل الذاتي',data:mSelfRev,color:COLORS[2],stack:'r'},{label:'دفعات المستثمرين',data:mInvRev,color:COLORS[3],stack:'r'},{label:'تكاليف التشغيل الذاتي',data:mSelfExp,color:COLORS[5],stack:'e'},{label:'الصافي',data:net,type:'line',stack:'n',color:'#b9925a',backgroundColor:'transparent',pointRadius:2,borderWidth:2.5}],st);
+    Charts.make('cf','bar',PM.cf.map(x=>x.mo),[{label:'أقساط المستأجرين',data:PM.cf.map(x=>Math.round(x.tenants)),color:COLORS[2],stack:'in'},{label:'دفعات المستثمرين',data:PM.cf.map(x=>Math.round(x.invIn)),color:COLORS[3],stack:'in'},{label:'الهيئة الملكية',data:PM.cf.map(x=>Math.round(x.auth)),color:COLORS[5],stack:'out'},{label:'المقاولون',data:PM.cf.map(x=>Math.round(x.om)),color:COLORS[1],stack:'out'}],st);
     if(PM.arrears) Charts.make('cag','bar',PM.aging.map(b=>b[0]),[{label:'المتأخر',data:PM.aging.map(b=>b[1]),backgroundColor:['#e0b85acc','#d98a3dcc','#c25a4acc','#8e2b22cc'],borderColor:['#e0b85a','#d98a3d','#c25a4a','#8e2b22']}],{plugins:{legend:{display:false}}});
     const ey=Object.keys(PM.expiry).sort(); Charts.make('cex','bar',ey,[{label:'عقود إيجار',data:ey.map(y=>PM.expiry[y].lease),color:COLORS[2],stack:'e'},{label:'عقود مستثمرين',data:ey.map(y=>PM.expiry[y].inv),color:COLORS[3],stack:'e'}],st);
     Charts.make('ccc','doughnut',PM.conc.map(x=>x.l),[{data:PM.conc.map(x=>x.v)}]); });

@@ -327,8 +327,8 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 /* القائمة الجانبية تُطوى بعد اختيار صفحة، وزر ☰ يعيدها */
 @media(min-width:901px){
   .app{transition:grid-template-columns .2s ease}
-  .app.nav-off{grid-template-columns:0 1fr}
-  .app.nav-off .nav{visibility:hidden;padding:0;overflow:hidden}
+  .app.nav-off{grid-template-columns:1fr}
+  .app.nav-off .nav{display:none}
 }
 .menu-btn{font-size:18px}
 
@@ -398,3 +398,26 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 @media (prefers-reduced-motion:reduce){.dmod,.drow{transition:none}.dmod:hover{transform:none}}
 
 .wlead{font-size:19px;font-weight:700;color:var(--text);line-height:1.6}
+
+/* لوحة التحكم المبسطة: الأساسي ثم المهم ثم التفاصيل */
+.dtier{font-size:14px;font-weight:800;color:var(--gold);margin:6px 2px 10px;display:flex;align-items:center;gap:10px}
+.dtier::after{content:"";flex:1;height:1px;background:var(--line)}
+.dhero{gap:16px} .dh-top{align-items:center}
+.dh-say{font-size:clamp(19px,2.2vw,24px);font-weight:700;margin:0;max-width:none;line-height:1.6}
+.deq{display:flex;align-items:stretch;gap:12px;flex-wrap:wrap}
+.deq em{font-style:normal;font-size:30px;font-weight:300;color:rgba(241,237,228,.5);align-self:center}
+.de{flex:1 1 150px;background:rgba(255,255,255,.07);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.de span{font-size:13.5px;color:rgba(241,237,228,.75);display:flex;align-items:center;gap:7px}
+.de span i{width:10px;height:10px;border-radius:3px} .de i.c{background:#8fa3b3} .de i.a{background:#b9925a} .de i.p{background:#4fae82}
+.de b{font-size:clamp(24px,2.8vw,34px);font-weight:800;font-variant-numeric:tabular-nums;line-height:1.2}
+.de.res{background:#f1ede4;flex-grow:1.4} .de.res span{color:#4a5a66} .de.res b{color:#16242f;font-size:clamp(30px,3.6vw,44px)} .de.res.neg b{color:#b3261e}
+.dhero .dh-eye{font-size:14px}
+.ddec h3{font-size:19px} .dt b{font-size:17px} .dt .small{font-size:13.5px} .damt b{font-size:24px}
+.dmp{display:flex;flex-direction:column;gap:2px} .dmp span{font-size:13.5px;color:var(--muted)}
+.dmp b{font-size:clamp(30px,3.4vw,42px);font-weight:800;font-variant-numeric:tabular-nums;line-height:1.15} .dmp b.neg{color:var(--red)} .dmp small{font-size:13.5px;color:var(--muted)}
+.dmod h3{font-size:18px}
+.dkpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:0}
+.dk{padding:20px 22px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;border-inline-start:1px solid var(--line)} .dk:first-child{border-inline-start:0}
+.dk .l{font-size:14.5px;color:var(--muted)} .dk .v{font-size:clamp(32px,3.6vw,44px);font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.dk .pill{font-size:13px} .dk .s{font-size:13.5px;color:var(--muted)}
+@media(max-width:760px){.dkpis{grid-template-columns:1fr}.dk{border-inline-start:0}.dk+.dk{border-top:1px solid var(--line)}.deq em{display:none}}
