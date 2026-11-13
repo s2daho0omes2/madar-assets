@@ -292,10 +292,6 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
   </section>
 
   <div class="dtier">المهم</div>
-  <div class="card mb ddec"><h3>يحتاج قرارك</h3>
-    ${D.length?D.slice(0,3).map((d,i)=>`<a class="drow ${d.tone}" href="${d.go}"><span class="dn">${i+1}</span><div class="dt"><b>${esc(d.t)}</b>${d.s?`<div class="small muted">${esc(d.s)}</div>`:''}</div>${d.amt?`<div class="damt"><b>${short(d.amt)}</b><small>${d.u}</small></div>`:'<div class="damt"><small>دقة البيانات</small></div>'}<span class="dgo">←</span></a>`).join(''):'<div class="empty">لا شيء عاجل اليوم.</div>'}
-    ${D.length>3?`<a class="small" href="#alerts" style="display:inline-block;margin-top:10px">عرض ${D.length-3} بنود أخرى</a>`:''}
-  </div>
   <div class="grid g2 mb">
     <a class="card dmod self" href="#operations"><div class="dmh"><h3>🏠 التشغيل الذاتي</h3><span class="small muted">${agN(self.length)}</span></div>
       <div class="dmp"><span>ربحه السنوي</span><b class="${S('profit')<0?'neg':''}">${short(S('profit'))}</b><small>من دخل ${short(S('rev'))}</small></div></a>
@@ -322,7 +318,11 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
       <div><h3>تركّز الدخل حسب الاتفاقية</h3><div class="chart" style="height:240px"><canvas id="ccc"></canvas></div></div>
       <div><h3>التنبيهات <a href="#alerts" class="small">عرض الكل</a></h3>${alertsHtml(alerts,6)}</div>
     </div>
-  </details>`;
+  </details>
+  <div class="card ddec" style="margin-top:16px"><h3>يحتاج قرارك</h3>
+    ${D.length?D.slice(0,3).map((d,i)=>`<a class="drow ${d.tone}" href="${d.go}"><span class="dn">${i+1}</span><div class="dt"><b>${esc(d.t)}</b>${d.s?`<div class="small muted">${esc(d.s)}</div>`:''}</div>${d.amt?`<div class="damt"><b>${short(d.amt)}</b><small>${d.u}</small></div>`:'<div class="damt"><small>دقة البيانات</small></div>'}<span class="dgo">←</span></a>`).join(''):'<div class="empty">لا شيء عاجل اليوم.</div>'}
+    ${D.length>3?`<a class="small" href="#alerts" style="display:inline-block;margin-top:10px">عرض ${D.length-3} بنود أخرى</a>`:''}
+  </div>`;
   v.querySelectorAll('tr[data-go]').forEach(r=>r.onclick=()=>{ location.hash=r.dataset.go; });
   const net=months.map((_,i)=>mSelfRev[i]+mInvRev[i]-mSelfExp[i]), st={scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,ticks:{callback:x=>short(x)}}}};
   let drawn=false; $('#dMore',v).addEventListener('toggle',e=>{ if(!e.target.open||drawn) return; drawn=true;
