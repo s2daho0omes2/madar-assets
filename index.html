@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 152 140%27%3E%3Cpath fill=%27%2316242f%27 fill-rule=%27evenodd%27 d=%27M10 0H142Q152 0 152 10V116L128 140H42V84L0 104V10Q0 0 10 0ZM42 38V100H112V38Z%27/%3E%3Cpath fill=%27%23b9925a%27 d=%27M0 118L42 96V140H10Q0 140 0 130Z%27/%3E%3C/svg%3E">
+<title>مدار الأصول</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=36">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+<div class="app">
+  <nav class="nav" id="nav"></nav>
+  <div class="main">
+    <header class="topbar">
+      <button class="btn ic menu-btn" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+      <h2 id="pageTitle">لوحة التحكم</h2>
+      <button class="btn ic" id="themeBtn" title="الوضع الليلي">🌙</button>
+      <button class="btn ic" id="alertsBtn" title="التنبيهات">🔔 <span id="alertCount" class="pill warn">0</span></button>
+      <div class="user">
+        <span class="small muted">المستخدم:</span>
+        <select id="userSel"></select>
+      </div>
+    </header>
+    <main class="content" id="view"></main>
+  </div>
+</div>
+<div id="modalRoot"></div>
+<script src="seed.js?v=28"></script>
+<script src="app.js?v=39"></script>
+</body>
+</html>
