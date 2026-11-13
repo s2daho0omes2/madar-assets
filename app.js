@@ -346,7 +346,7 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
     ${big('عقود تنتهي خلال 90 يوماً',ending.length,ending.length?'bad':'ok',ending.length?'تحتاج قراراً':'لا يوجد',ending.length?ending.map(x=>esc(nm(x))).join('، '):'كل العقود سارية لأكثر من 90 يوماً')}
   </div>
   <div class="card mb" style="padding:8px"><div class="dmaph"><h3>مواقع المشاريع</h3><span class="small muted">${gpins.length?'اضغط أي موقع لعرض ملخصه':'لم تُربط مواقع بعد'}</span><span class="sp"></span><a class="btn sm" href="#gis">${gpins.length?'تعديل المواقع':'حدّد مواقع المشاريع'}</a></div>
-    <div class="gmap" id="dMap"><img src="${GIS_BASE.src}" alt="خريطة ${GIS_BASE.name}" draggable="false">${gpins.map(a=>`<button type="button" class="gpin ${gisTone(a)}" style="left:${a.x}%;top:${a.y}%" data-id="${a.id}" aria-label="${esc(a.name)}"><i></i><span>${esc(a.name)}</span></button>`).join('')}</div>
+    <div class="gmap" id="dMap"><img src="${GIS_BASE.src}" alt="خريطة ${GIS_BASE.name}" draggable="false">${gpins.map(a=>gisPin(a)).join('')}</div>
     <div class="gleg"><span><i class="self"></i>تشغيل ذاتي</span><span><i class="inv"></i>إسناد لمستثمر</span><span><i class="none"></i>بلا اتفاقية</span></div></div>
 
   <div class="dtier">تفاصيل أخرى</div>
@@ -1090,6 +1090,10 @@ const GIS_BASE={id:'MAP-YANBU',name:'ينبع الصناعية',src:'assets/yanb
 const healthBadgeOf=a=>{ const k=agreementFor(a.id); return k&&k.assetId===a.id?healthBadge(k):''; };
 /* ملخص موقع على الخريطة: يُستخدم في صفحة الخريطة ولوحة التحكم */
 const gisTone=a=>{ const t=agreementFor(a.id)?.type; return t==='تشغيل ذاتي'?'self':t==='مستثمر'?'inv':'none'; };
+/* دبوس الخريطة: علامة على شكل قطرة تشير للموقع بدقة، وبطاقة اسم بيضاء فيها المستوى والمشروع */
+const gisPin=(a,extra='')=>{ const k=agreementFor(a.id), t=gisTone(a), ic={project:'🏙️',district:'🏘️',building:'🏢',unit:'🏠'}[a.level]||'📍', proj=k&&k.assetId!==a.id?assetPlain(k.assetId):'';
+  const sub=[LEVELS[a.level],proj,k?(k.type==='مستثمر'?'إسناد لمستثمر':'تشغيل ذاتي'):'بلا اتفاقية'].filter(Boolean).join(' · ');
+  return `<button type="button" class="gpin ${t} ${extra}" style="left:${a.x}%;top:${a.y}%" data-id="${a.id}" aria-label="${esc(a.name)}، ${esc(sub)}"><em></em><i><b>${ic}</b></i><span><strong>${esc(a.name)}</strong><small>${esc(sub)}</small></span></button>`; };
 const gisInfo=a=>{ const k=agreementFor(a.id), p=k&&agreementPL(k); return `<div class="nplist"><div class="nprow"><span>المستوى</span><b>${LEVELS[a.level]}</b></div><div class="nprow"><span>الموقع</span><b>${esc(a.location||'—')}</b></div><div class="nprow"><span>نموذج التشغيل</span><b>${k?AG_LABEL[k.type]:'بلا اتفاقية'}</b></div>${k?`<div class="nprow"><span>الاتفاقية</span><b>${esc(k.type==='مستثمر'?k.party:k.title)}</b></div><div class="nprow"><span>الربح السنوي للاتفاقية</span><b>${num(p.profit)} ر.س</b></div><div class="nprow"><span>ندفع للهيئة الملكية</span><b>${num(p.pay)} ر.س</b></div>`:''}</div>`; };
 M.gis={key:'gis',label:'الخريطة',icon:'🗺️',group:'متقدم',render(v){
   let curMap=GIS_BASE.id, moving=null;
@@ -1100,7 +1104,7 @@ M.gis={key:'gis',label:'الخريطة',icon:'🗺️',group:'متقدم',render
       <span class="wlead" style="font-size:16px">${mv?`انقر على الخريطة لتحديد الموقع الجديد لـ«${esc(mv.name)}»`:'انقر أي نقطة على الخريطة لربطها بمشروع.'}</span>${mv?'<button class="btn sm" id="mvX">إلغاء النقل</button>':''}<span class="sp"></span>
       ${can('edit')?`<label class="btn sm">📤 رفع خريطة أخرى<input type="file" accept="image/*" id="mapUp" class="hidden"></label>`:''}${!mp.builtin&&can('delete')?`<button class="btn d sm" id="mapDel">حذف الخريطة</button>`:''}</div>
       <div class="card" style="padding:8px"><div class="gmap ${can('edit')?'edit':''}" id="map"><img src="${mp.src}" alt="خريطة ${esc(mp.name)}" draggable="false">
-        ${pins.map(a=>`<button type="button" class="gpin ${tone(a)} ${a.id===moving?'mv':''}" style="left:${a.x}%;top:${a.y}%" data-id="${a.id}" aria-label="${esc(a.name)}"><i></i><span>${esc(a.name)}</span></button>`).join('')}</div>
+        ${pins.map(a=>gisPin(a,a.id===moving?'mv':'')).join('')}</div>
         <div class="gleg"><span><i class="self"></i>تشغيل ذاتي</span><span><i class="inv"></i>إسناد لمستثمر</span><span><i class="none"></i>بلا اتفاقية</span><span class="sp"></span><span class="muted">${pins.length} موقع مربوط</span></div></div>
       <div class="card" style="margin-top:14px"><h3>المواقع المربوطة (${pins.length})</h3>${pins.length?`<div class="twrap"><table class="tbl"><thead><tr><th>الأصل</th><th>المستوى</th><th>نموذج التشغيل</th><th>الربح السنوي</th><th></th></tr></thead><tbody>${pins.map(a=>{ const k=agreementFor(a.id); return `<tr class="clk" data-id="${a.id}"><td><b>${esc(a.name)}</b><div class="small muted">${esc(a.location||'')}</div></td><td>${LEVELS[a.level]}</td><td>${k?pill(AG_LABEL[k.type]):'—'}</td><td>${k&&k.assetId===a.id?num(agreementPL(k).profit):'—'}</td><td>${healthBadgeOf(a)}</td></tr>`; }).join('')}</tbody></table></div>`:'<div class="empty">لا توجد مواقع بعد. انقر على مكان المشروع في الخريطة واختره من القائمة.</div>'}</div>`;
     $('#mapSel',v).onchange=e=>{ curMap=e.target.value; moving=null; draw(); };

@@ -492,19 +492,25 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .wrc-stats em{font-style:normal;font-weight:800;color:#d4ad74;margin-inline-start:4px;font-size:11.5px}
 
 /* الخريطة التفاعلية */
-.gmap{position:relative;border-radius:12px;overflow:hidden;line-height:0;user-select:none}
-.gmap img{width:100%;height:auto;display:block} .gmap.edit{cursor:crosshair}
-.gpin{all:unset;position:absolute;transform:translate(-50%,-50%);cursor:pointer;display:flex;flex-direction:column;align-items:center;line-height:1.3;z-index:2}
-.gpin i{width:22px;height:22px;border-radius:50%;border:3px solid #fff;background:#8a949c;box-shadow:0 2px 8px rgba(0,0,0,.55);transition:transform .15s}
-.gpin.self i,.gleg i.self{background:#c98a3d} .gpin.inv i,.gleg i.inv{background:#3f86b8} .gleg i.none{background:#8a949c}
-.gpin span{position:absolute;top:calc(100% + 4px);white-space:nowrap;font-size:13px;font-weight:700;color:#fff;background:rgba(22,36,47,.88);padding:2px 9px;border-radius:8px}
-.gpin:hover i,.gpin:focus-visible i{transform:scale(1.25)} .gpin:focus-visible i{outline:3px solid #d4ad74;outline-offset:2px}
+.gmap{position:relative;border-radius:12px;overflow:hidden;line-height:0;user-select:none;background:#d9cfbd}
+.gmap img{width:100%;height:auto;display:block;filter:saturate(.55) brightness(.97)} .gmap.edit{cursor:crosshair}
+.gpin{--pc:#8a949c;all:unset;position:absolute;width:0;height:0;cursor:pointer;z-index:2;line-height:1.3}
+.gpin.self,.gleg i.self{--pc:#c27a2c} .gpin.inv,.gleg i.inv{--pc:#2f78b7} .gleg i.none{--pc:#8a949c}
+.gpin em{position:absolute;left:-14px;top:-7px;width:28px;height:14px;border-radius:50%;background:var(--pc);opacity:.35;animation:gring 2.4s ease-out infinite}
+.gpin i{position:absolute;left:-19px;top:-46px;width:38px;height:38px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--pc);border:3px solid #fff;box-shadow:0 6px 14px rgba(0,0,0,.45);transition:transform .15s}
+.gpin i b{display:grid;place-items:center;width:100%;height:100%;transform:rotate(45deg);font-size:17px;font-weight:400}
+.gpin span{position:absolute;left:50%;bottom:52px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:1px;white-space:nowrap;background:#fff;color:#16242f;padding:5px 11px;border-radius:9px;box-shadow:0 4px 14px rgba(0,0,0,.3);border-bottom:3px solid var(--pc);pointer-events:none}
+.gpin span strong{font-size:14px;font-weight:800} .gpin span small{font-size:11.5px;color:#5b6670}
+.gpin:hover,.gpin:focus-visible{z-index:5} .gpin:hover i,.gpin:focus-visible i{transform:rotate(-45deg) scale(1.15)}
+.gpin:focus-visible i{outline:3px solid #d4ad74;outline-offset:3px}
 .gpin.mv i{animation:gpulse 1s ease-in-out infinite}
-@keyframes gpulse{50%{transform:scale(1.5);opacity:.6}}
-.gtmp{position:absolute;width:18px;height:18px;border-radius:50%;border:3px dashed #fff;background:rgba(212,173,116,.7);transform:translate(-50%,-50%);z-index:1;pointer-events:none}
+@keyframes gpulse{50%{transform:rotate(-45deg) scale(1.3)}}
+@keyframes gring{0%{transform:scale(.6);opacity:.55}100%{transform:scale(2.2);opacity:0}}
+.gtmp{position:absolute;width:18px;height:18px;border-radius:50%;border:3px dashed #fff;background:rgba(212,173,116,.8);transform:translate(-50%,-50%);z-index:1;pointer-events:none;box-shadow:0 0 0 4px rgba(0,0,0,.25)}
 .gleg{display:flex;align-items:center;gap:8px 18px;flex-wrap:wrap;padding:10px 6px 2px;font-size:13.5px;line-height:1.4}
-.gleg span{display:inline-flex;align-items:center;gap:7px} .gleg i{width:13px;height:13px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
-@media (prefers-reduced-motion:reduce){.gpin.mv i{animation:none}}
+.gleg span{display:inline-flex;align-items:center;gap:7px} .gleg i{width:13px;height:13px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--pc);border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+@media (max-width:700px){.gpin span small{display:none}.gpin span{padding:3px 8px}.gpin span strong{font-size:12px}}
+@media (prefers-reduced-motion:reduce){.gpin.mv i,.gpin em{animation:none}}
 
 .dmaph{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 8px 10px} .dmaph h3{margin:0}
 
