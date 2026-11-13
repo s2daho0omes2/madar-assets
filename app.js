@@ -936,13 +936,16 @@ function clientDetail(c){
 /* التشغيل الذاتي: إشغال، تحصيل، ملفات عملاء */
 M.operations={key:'operations',label:'التشغيل الذاتي',icon:'🏠',group:'نماذج التشغيل',render(v){
   const SK=opAgreements().filter(k=>k.type==='تشغيل ذاتي');
-  const units=Store.coll('assets').filter(a=>a.level==='unit'); const occ=units.filter(u=>u.occupancy==='مشغول');
-  const allF=finOf(Store.coll('payments')); const due=allF.overdue; const rentTotal=sum(occ,'rent');
-  const bld=Store.coll('assets').filter(a=>a.level==='building');
+  /* نطاق الصفحة: أصول اتفاقيات التشغيل الذاتي فقط، لا المسندة لمستثمر */
+  const isSelf=a=>agreementFor(a.id)?.type==='تشغيل ذاتي';
+  const units=Store.coll('assets').filter(a=>a.level==='unit'&&isSelf(a)); const occ=units.filter(u=>u.occupancy==='مشغول'); const uid=new Set(units.map(u=>u.id));
+  const selfPays=Store.coll('payments').filter(p=>uid.has(p.assetId)||uid.has(Store.get('clients',p.clientId)?.assetId));
+  const allF=finOf(selfPays); const due=allF.overdue; const rentTotal=sum(occ,'rent');
+  const bld=Store.coll('assets').filter(a=>a.level==='building'&&isSelf(a));
   v.innerHTML=`<div class="pagehead self"><div><h3>🏠 التشغيل الذاتي <span class="en">Self-Operation</span></h3><p class="small muted">ندفع للهيئة الملكية ونتولى التأجير والتحصيل والتشغيل بأنفسنا.</p></div><div class="phx"><span class="pill gold">${SK.length} اتفاقية</span>${can('edit')?'<button class="btn p sm" data-np="self">＋ إضافة مشروع</button>':''}</div></div><div class="grid g4 mb">
     <div class="card kpi"><div class="l">الإشغال</div><div class="v">${pct(occ.length,units.length)}%</div><div class="s">${occ.length}/${units.length} وحدة</div></div>
     <div class="card kpi" style="--kc:var(--gold)"><div class="l">المحصّل من جداول الدفعات</div><div class="v">${short(allF.paid)}</div><div class="s">من ${short(allF.total)} · متبقي ${short(allF.remaining)}</div><div class="bar gold" style="margin-top:6px"><i style="width:${allF.pct}%"></i></div></div>
-    <div class="card kpi" style="--kc:var(--red)"><div class="l">مستحقات متأخرة (تحصيل)</div><div class="v">${short(due)}</div><div class="s">${Store.coll('clients').filter(c=>clientFin(c).overdue>0).length} عميل</div></div>
+    <div class="card kpi" style="--kc:var(--red)"><div class="l">مستحقات متأخرة (تحصيل)</div><div class="v">${short(due)}</div><div class="s">${Store.coll('clients').filter(c=>uid.has(c.assetId)&&clientFin(c).overdue>0).length} عميل</div></div>
     <div class="card kpi" style="--kc:var(--sky)"><div class="l">المباني</div><div class="v">${bld.length}</div></div></div>
   <div class="tabs"><button class="active" data-t="sag">اتفاقيات التشغيل الذاتي</button><button data-t="om">مقاولو التشغيل والصيانة</button><button data-t="mt">العدادات</button><button data-t="be">سعر التعادل للتأجير</button><button data-t="occ">الإشغال والتأجير</button><button data-t="cl">ملفات العملاء</button><button data-t="bld">حالة المباني</button></div>
   <div data-p="sag"><div class="grid g2 mb">${SK.map(agCard).join('')||'<div class="card empty">لا توجد اتفاقيات تشغيل ذاتي</div>'}</div><div id="sagMg"></div></div><div data-p="om" class="hidden"></div><div data-p="mt" class="hidden"></div><div data-p="be" class="hidden"></div><div data-p="occ" class="hidden"></div><div data-p="cl" class="hidden"></div><div data-p="bld" class="hidden">
