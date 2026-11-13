@@ -1446,6 +1446,7 @@ const App={
     let html=`<div class="brand"><div class="mark">${MADAR_MARK}</div><div><h1>مدار الأصول<small>منصة إدارة الأصول العقارية</small></h1></div></div></div>`; let g='';
     NAV_ORDER.forEach(k=>{ const m=M[k]; if(m.group!==g){ g=m.group; html+=`<div class="group">${g}</div>`; } html+=`<a class="item" href="#${k}" data-k="${k}"><span class="ic">${m.icon}</span>${m.label}<span class="badge hidden" data-b="${k}"></span></a>`; });
     $('#nav').innerHTML=html; this.refreshBadges();
+    $('#nav').onclick=e=>{ if(e.target.closest('a.item')&&innerWidth>900) document.querySelector('.app').classList.add('nav-off'); };
   },
   refreshBadges(){
     const b={alerts:computeAlerts().length};

@@ -193,7 +193,7 @@ a{color:var(--green)}
   .content{padding:14px 14px 60px}
   .menu-btn{display:inline-flex!important}
 }
-.menu-btn{display:none}
+.menu-btn{display:inline-flex}
 @media print{.nav,.topbar,.toolbar,.btn{display:none!important}.app{display:block}.content{padding:0}.card{box-shadow:none;break-inside:avoid}}
 
 /* صفحات نماذج التشغيل */
@@ -323,3 +323,11 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .wiz{animation:wzIn .3s ease}
 @keyframes wzIn{from{opacity:.4;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.wiz,.wzside{animation:none}}
+
+/* القائمة الجانبية تُطوى بعد اختيار صفحة، وزر ☰ يعيدها */
+@media(min-width:901px){
+  .app{transition:grid-template-columns .2s ease}
+  .app.nav-off{grid-template-columns:0 1fr}
+  .app.nav-off .nav{visibility:hidden;padding:0;overflow:hidden}
+}
+.menu-btn{font-size:18px}
