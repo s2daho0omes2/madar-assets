@@ -1337,15 +1337,25 @@ M.whatif={key:'whatif',label:'دراسة وتحليل الفرصة',icon:'🔍',
     <dl><dt>صافي الربح على ${wiYrs(x.H)}</dt><dd>${short(x.total)}</dd><dt>صافي السنة الأولى</dt><dd>${short(x.y1)}</dd><dt>متوسط الربح السنوي</dt><dd>${short(x.avgProfit)}</dd><dt>العائد الداخلي</dt><dd>${o==='inv'&&!val.invCost?'بلا استثمار':irrT(x.irr)}</dd><dt>أقصى احتياج سيولة</dt><dd>${x.peak<0?short(-x.peak):'لا يوجد'}</dd><dt>فترة الاسترداد</dt><dd>${wiPb(x)}</dd><dt>المخاطر علينا</dt><dd>${WI_OPTS[o].risk}</dd></dl>`}</button>`; };
   const STRESS=[['الإشغال أقل بـ10 نقاط',{qOcc:val.qOcc-10}],['الإيجار أقل 10%',{qRent:val.qRent*0.9}],['التكاليف أعلى 15%',{fixed:val.fixed*1.15,varPct:val.varPct*1.15,maint:val.maint*1.15}],['الصيانة أعلى 30%',{maint:val.maint*1.3}],['تأخر بدء الإيرادات 6 أشهر',{setupM:val.setupM+6}],['التحصيل 85%',{coll:Math.min(val.coll,85)}],['العائد المطلوب +2%',{disc:val.disc+2}]].map(([l,o])=>{ const d=wiDecide(val,o); return {l,team:d.R.team.val,inv:d.R.inv.val,best:d.best}; });
   const REC_OK=val.qUnits>0&&val.qRent>0, RI=val.qOffer?R.inv:wiSim(val,'inv',{qOffer:A.minOffer||0});
+  const RX=D.best==='inv'?RI:R.team;
   const sel=R[st.opt], rowsT=[['الإيرادات المحصّلة','rev'],['عقد الصيانة والإصلاحات','maint'],['تكاليف التشغيل الأخرى','opex'],['المسدد للهيئة الملكية والالتزامات الأخرى','auth'],['التجهيز والتجديدات والسيولة','capex'],['التمويل (سحب وسداد)','fin'],['الزكاة والضرائب','zakat']].filter(([,key])=>sel.rows.some(r=>Math.abs(r[key])>0.5));
   v.innerHTML=`${toolbar}
   <div class="card mb"><div class="wsumh"><h3>إجاباتك</h3><span class="small muted">اضغط أي إجابة لتعديلها</span><span class="sp"></span><button class="btn sm" id="wzRe">مراجعة الأسئلة من البداية</button></div>
     <div class="wsum">${Q.map((f,j)=>`<button type="button" class="wchip" data-j="${j}"><span>${esc(f.s)}</span><b>${esc(disp(f))}</b></button>`).join('')}</div></div>
-  <div class="card rec ${A.tone} mb">
-    <h3>${D.best?WI_OPTS[D.best].ic+' ':''}${A.title}</h3>${A.action?`<p style="margin:-4px 0 10px"><b>${A.action}</b></p>`:''}
-    <div class="grid g2 wrec"><div><div class="small muted" style="margin-bottom:6px">لماذا</div><ul class="why">${A.why.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>
-    <div><div class="small muted" style="margin-bottom:6px">الخطوات المقترحة</div><ol class="why">${A.plan.map(w=>`<li>${esc(w)}</li>`).join('')}</ol></div></div>
-  </div>
+  <section class="wrc ${A.tone} mb">
+    <div class="wrc-top">
+      <div class="wrc-main"><div class="wrc-eye">التوصية</div><h2>${D.best&&REC_OK?WI_OPTS[D.best].ic+' ':''}${esc(A.title.replace('التوصية: ',''))}</h2>${A.action?`<p>${esc(A.action)}</p>`:''}</div>
+      ${REC_OK?`<div class="wrc-stats">
+        <div><span>مجموع الربح على ${wiYrs(RX.H)}</span><b class="${RX.total<0?'neg':''}">${short(RX.total)}</b></div>
+        <div><span>متوسط الربح السنوي</span><b class="${RX.avgProfit<0?'neg':''}">${short(RX.avgProfit)}</b></div>
+        ${D.best==='team'?`<div><span>حد الإشغال الآمن</span><b>${A.occB>100?'غير ممكن':Math.round(A.occB)+'%'}</b></div>`:`<div><span>${val.qOffer?'عرض المستثمر':'أقل عرض مقبول'}</span><b>${short(val.qOffer||A.minOffer||0)}</b></div>`}
+      </div>`:''}
+    </div>
+    ${A.why.length||A.plan.length?`<div class="wrc-body">
+      <div><h4>لماذا هذه التوصية</h4><ul class="wrc-why">${A.why.map(w=>{ const warn=/تحذير|تنبيه|مرتفعة|مشروط|غير كافية|خاسر|لا يغطي|لن يتفوق/.test(w); return `<li class="${warn?'w':''}"><i>${warn?'!':'✓'}</i><span>${esc(w)}</span></li>`; }).join('')}</ul></div>
+      <div><h4>الخطوات المقترحة</h4><ol class="wrc-steps">${A.plan.map((w,i)=>`<li><i>${i+1}</i><span>${esc(w)}</span></li>`).join('')}</ol></div>
+    </div>`:''}
+  </section>
   ${REC_OK?`<div class="card mb"><h3>النتيجة بالرسم <span class="small muted">${val.qOffer?'مقارنة النموذجين سنة بسنة':'لم يصلك عرض، فخط الإسناد محسوب على أقل عرض مقبول ('+num(Math.round(A.minOffer||0))+' ر.س سنوياً)'}</span></h3>
     <div class="grid g2" style="margin-top:6px">
       <div><div class="wct">صافي الربح كل سنة</div><div class="chart"><canvas id="wiB"></canvas></div></div>
