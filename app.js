@@ -1182,7 +1182,7 @@ const WI_FD=[
   {id:'qReady',g:'q',s:'جاهز للتأجير',l:'هل الأصل جاهز للتأجير الآن؟',opts:WI_YN,def:()=>'no'},
   {id:'maint',g:'q',s:'صيانة الوحدة سنوياً',min:0,l:'كم تكلفة الصيانة السنوية للوحدة الواحدة؟',u:'ر.س',def:v=>WI_COND[v.qCond].maint,src:()=>'مرجع تقريبي حسب حالة الأصل',hint:'تشمل عقد الصيانة الوقائية والإصلاحات وقطع الغيار'},
   {id:'util',g:'q',s:'عدادات الوحدة سنوياً',min:0,l:'كم تكلفة العدادات (كهرباء ومياه) السنوية للوحدة في التشغيل الذاتي؟',u:'ر.س',def:()=>1800,src:()=>'مرجع تقريبي',hint:'ما تدفعه أنت: المناطق المشتركة والإنارة والوحدات الشاغرة. صفر إن كان المستأجر يدفع كل شيء'},
-  {id:'opsU',g:'q',s:'تشغيل الوحدة سنوياً',min:0,l:'كم تكلفة عملية التشغيل السنوية للوحدة؟',u:'ر.س',def:v=>v.qUnits>=100?3000:v.qUnits>=40?4000:5500,src:()=>'مرجع تقريبي حسب حجم المشروع',hint:'رواتب فريق التأجير والتحصيل، الحراسة، النظافة، الإدارة والأنظمة والتأمين'},
+  {id:'opsU',g:'q',per:12,s:'تشغيل الوحدة شهرياً',min:0,l:'كم تكلفة عملية التشغيل الشهرية للوحدة؟',u:'ر.س شهرياً',def:v=>v.qUnits>=100?3000:v.qUnits>=40?4020:5520,src:()=>'مرجع تقريبي حسب حجم المشروع',hint:'رواتب فريق التأجير والتحصيل، الحراسة، النظافة، الإدارة والأنظمة والتأمين'},
   {id:'qTeam',g:'جاهزية التشغيل الذاتي',s:'فريق التشغيل',l:'جاهزية فريقك للتأجير والتشغيل والتحصيل',hint:'تؤثر على نسبة التحصيل وعلاوة مخاطر التشغيل الذاتي',opts:WI_TEAM,def:()=>'part'},
   {id:'qOffer',g:'q',s:'عرض المستثمر',min:0,l:'كم عرض المستثمر السنوي؟',u:'ر.س',def:(v,S)=>S.offer,src:S=>S.offer?'العقد الحالي':'',hint:'اتركه صفراً إن لم يصلك عرض، وتظهر لك أقل قيمة تقبلها'},
   {id:'qH',g:'q',s:'مدة القرار',min:1,max:30,l:'كم سنة مدة القرار؟',u:'سنة',def:()=>5},
@@ -1232,7 +1232,7 @@ const WI_WHY={
   qReady:['إن احتاج الأصل تجهيزاً، فهناك صرف وانتظار قبل أي دخل.','«نعم»: لا تكلفة تجهيز ويبدأ الدخل فوراً. «لا»: تكلفة تجهيز وأشهر بلا دخل في التشغيل الذاتي، ويطلب المستثمر عادة فترة سماح.','التجهيز يشمل التشطيب والأثاث والأنظمة وتسويق الإطلاق.'],
   maint:['الصيانة من أكبر التكاليف المتكررة، وتزيد مع عمر الأصل.','تُحسب: عدد الوحدات × تكلفة الوحدة، كعقد صيانة سنوي يبدأ مع التشغيل وينمو كل سنة بنسبة نمو التكاليف. في التشغيل الذاتي تتحملها أنت، وعند الإسناد يتحملها المستثمر.','مرجع تقريبي للسكني: جديد 1,500، متوسط 2,500، قديم 4,000 ر.س للوحدة سنوياً. أكّد الرقم بعرض سعر من مقاول صيانة.'],
   util:['في التشغيل الذاتي أنت صاحب العدادات، وأي استهلاك لا يدفعه مستأجر يقع عليك.','تُحسب: عدد الوحدات × تكلفة الوحدة، وتنمو سنوياً بنسبة نمو التكاليف. تُحمَّل على التشغيل الذاتي فقط، وعند الإسناد يتحملها المستثمر.','المرجع التقريبي 1,800 ر.س للوحدة سنوياً (مناطق مشتركة وإنارة وشواغر). ارفعه إن كانت الفواتير كلها باسمك، وراجعه من فواتير آخر سنة.'],
-  opsU:['التشغيل الذاتي يعني فريقاً وإدارة تدفع أنت تكلفتها.','تُحسب: عدد الوحدات × تكلفة الوحدة = إجمالي تكاليف عملية التشغيل. تُحمَّل على التشغيل الذاتي فقط.','مرجع تقريبي للوحدة سنوياً: 3,000 للمشاريع الكبيرة (100 وحدة فأكثر)، 4,000 للمتوسطة، 5,500 للصغيرة، لأن التكاليف الثابتة تتوزع على وحدات أقل.'],
+  opsU:['التشغيل الذاتي يعني فريقاً وإدارة تدفع أنت تكلفتها كل شهر.','تُحسب: عدد الوحدات × تكلفة الوحدة الشهرية × 12 = إجمالي تكاليف عملية التشغيل السنوية. تُحمَّل على التشغيل الذاتي فقط.','مرجع تقريبي للوحدة شهرياً: 250 ر.س للمشاريع الكبيرة (100 وحدة فأكثر)، 335 للمتوسطة، 460 للصغيرة، لأن التكاليف الثابتة تتوزع على وحدات أقل.'],
   qTeam:['التشغيل الذاتي يحتاج فريقاً يؤجر ويحصّل ويتابع الصيانة.','بدون فريق ترتفع علاوة مخاطر التشغيل الذاتي وتنخفض نسبة التحصيل المتوقعة، فيقترب خيار الإسناد لمستثمر.','«جزئياً» تعني أن لديك بعض الأدوار وتحتاج تعيين أو تعاقد للباقي.'],
   qOffer:['عرض المستثمر هو البديل المضمون للتشغيل الذاتي.','نحسب دفعاته مع الزيادة الدورية وفترة السماح ونقارنها بالتشغيل الذاتي. إن تركته صفراً نحسب لك أقل عرض يستحق القبول.','قارن العروض على نفس الشروط: الزيادة الدورية، فترة السماح، ومن يدفع للهيئة الملكية.'],
   qCash:['حتى المشروع الرابح قد يتعثر إن نفدت السيولة قبل استقرار الدخل.','نقارنها بأقصى احتياج سيولة في التشغيل الذاتي (التجهيز + أشهر الانتظار + الالتزامات)، وننبهك إن لم تكفِ.','صفر يعني تجاهل هذا الاختبار.'],
@@ -1318,7 +1318,7 @@ M.whatif={key:'whatif',label:'دراسة وتحليل الفرصة',icon:'🔍',
   const Q=WI_FD.filter(f=>f.g==='q'); if(st.step===undefined) st.step=sv.done?null:0;
   const toolbar=`<div class="toolbar"><span class="wlead">حلّل أي مشروع جديد: أجب عن الأسئلة، ويقترح لك طريقة التشغيل الأنسب وأرقامها.</span><span class="sp"></span><button class="btn sm" id="wiReset">↺ دراسة مشروع جديد</button></div>`;
   const bindTop=()=>{ $('#wiReset',v).onclick=()=>ask('ستُمسح إجابات الدراسة الحالية وتبدأ الأسئلة من جديد لمشروع آخر.',()=>{ delete Store.data.wiStudies[WI_KEY]; Store.save(); st.opt=''; st.step=0; M.whatif.render(v); },'دراسة جديدة'); };
-  const disp=f=>{ const x=val[f.id]; if(f.opts) return f.opts[x]?.l||'—'; if(!x&&['qOffer','qCash'].includes(f.id)) return f.id==='qCash'?'غير محددة':'لا يوجد'; if(f.id==='qH') return wiYrs(x); if(f.id==='qRamp') return x?`${x} شهر`:'فوري'; return `${Number(x).toLocaleString('en-US')} ${f.u||''}`; };
+  const disp=f=>{ const x=val[f.id]; if(f.opts) return f.opts[x]?.l||'—'; if(!x&&['qOffer','qCash'].includes(f.id)) return f.id==='qCash'?'غير محددة':'لا يوجد'; if(f.id==='qH') return wiYrs(x); if(f.id==='qRamp') return x?`${x} شهر`:'فوري'; return `${Math.round(Number(x)/(f.per||1)).toLocaleString('en-US')} ${f.u||''}`; };
   if(st.step!=null){ const i=Math.max(0,Math.min(Q.length-1,st.step)), f=Q[i], cur=val[f.id], sug=f.def(val,S), from=f.src&&f.src(S);
     const W=WI_WHY[f.id]||[], full=val.qUnits*val.qRent, occI=Q.findIndex(q=>q.id==='qOcc'), atOcc=full*(val.qOcc/100);
     const selfLeft=atOcc-val.auth-val.qUnits*(val.maint+val.util)-val.fixed;
@@ -1330,21 +1330,21 @@ M.whatif={key:'whatif',label:'دراسة وتحليل الفرصة',icon:'🔍',
         <div class="sub">تكاليف التشغيل الذاتي (لا تتحملها عند الإسناد):</div>
         <div><span>الصيانة (${Number(val.maint).toLocaleString('en-US')} للوحدة)</span><b class="neg">${val.maint?'-'+short(val.qUnits*val.maint):'0'}</b></div>
         <div><span>العدادات (${Number(val.util).toLocaleString('en-US')} للوحدة)</span><b class="neg">${val.util?'-'+short(val.qUnits*val.util):'0'}</b></div>
-        <div><span>عملية التشغيل (${Number(val.opsU).toLocaleString('en-US')} للوحدة)</span><b class="neg">${val.fixed?'-'+short(val.fixed):'0'}</b></div>
+        <div><span>عملية التشغيل (${Math.round(val.opsU/12).toLocaleString('en-US')} للوحدة شهرياً)</span><b class="neg">${val.fixed?'-'+short(val.fixed):'0'}</b></div>
         <div class="tot"><span>المتبقي من التشغيل الذاتي</span><b class="${selfLeft<0?'neg':''}">${short(selfLeft)}</b></div></div></aside>`;
     v.innerHTML=`${toolbar}<div class="wizw"><div class="card wiz"><div class="wzp"><span>السؤال ${i+1} من ${Q.length}</span><div class="bar gold"><i style="width:${Math.round((i+1)/Q.length*100)}%"></i></div></div>
       <div class="wzdots">${Q.map((q,j)=>`<button type="button" class="${j===i?'on':''} ${sv.t[q.id]?'ok':''}" data-j="${j}" title="${esc(q.s)}" aria-label="${esc(q.s)}"></button>`).join('')}</div>
       <h2 class="wzq">${esc(f.l)}</h2>${f.hint?`<p class="muted wzh">${esc(f.hint)}</p>`:''}
       ${f.opts?`<div class="wzo">${Object.entries(f.opts).map(([a,o])=>`<button type="button" class="wzb ${cur===a?'on':''}" data-a="${a}">${o.l}</button>`).join('')}</div>`
-        :`<div class="wzn"><input id="wzI" type="number" inputmode="decimal" ${f.min!=null?`min="${f.min}"`:''} ${f.max!=null?`max="${f.max}"`:''} value="${Math.round(cur*100)/100}"><span>${f.u||''}</span></div>
-        ${f.req&&!sug?'<div class="small muted wzs">أدخل الرقم الصحيح لمشروعك</div>':''}<div class="small muted wzs" ${f.req&&!sug?'hidden':''}>المقترح: <b>${Number(sug).toLocaleString('en-US')} ${f.u||''}</b>${from?` · ${from}`:''} ${sug!==cur?`<button type="button" class="lnk" id="wzSug">استخدمه</button>`:''}</div>`}
+        :`<div class="wzn"><input id="wzI" type="number" inputmode="decimal" ${f.min!=null?`min="${f.min}"`:''} ${f.max!=null?`max="${f.max}"`:''} value="${Math.round(cur/(f.per||1)*100)/100}"><span>${f.u||''}</span></div>
+        ${f.req&&!sug?'<div class="small muted wzs">أدخل الرقم الصحيح لمشروعك</div>':''}<div class="small muted wzs" ${f.req&&!sug?'hidden':''}>المقترح: <b>${Math.round(Number(sug)/(f.per||1)).toLocaleString('en-US')} ${f.u||''}</b>${from?` · ${from}`:''}${f.per&&cur?` · المدخل حالياً يساوي ${Math.round(cur).toLocaleString('en-US')} ر.س سنوياً`:''} ${sug!==cur?`<button type="button" class="lnk" id="wzSug">استخدمه</button>`:''}</div>`}
       <div class="wzf"><button class="btn" id="wzBack" ${i?'':'disabled'}>السابق</button><span class="sp"></span>${sv.done?'<button class="btn" id="wzRes">النتيجة مباشرة</button>':''}<button class="btn p" id="wzNext">${i===Q.length-1?'عرض النتيجة':'التالي'}</button></div></div>${side}</div>`;
     bindTop();
     const save=x=>{ sv.v[f.id]=x; sv.t[f.id]=1; }, go=j=>{ if(j>=Q.length){ sv.done=1; st.step=null; } else st.step=Math.max(0,j); Store.save(); M.whatif.render(v); window.scrollTo({top:0,behavior:'smooth'}); };
-    const readN=()=>{ let x=Number($('#wzI',v).value); if(!isFinite(x)) x=0; if(f.min!=null) x=Math.max(f.min,x); if(f.max!=null) x=Math.min(f.max,x); return x; };
+    const readN=()=>{ let x=Number($('#wzI',v).value); if(!isFinite(x)) x=0; if(f.min!=null) x=Math.max(f.min,x); if(f.max!=null) x=Math.min(f.max,x); return x*(f.per||1); };
     v.querySelectorAll('.wzb').forEach(b=>b.onclick=()=>{ v.querySelectorAll('.wzb').forEach(x=>x.classList.remove('on')); b.classList.add('on'); save(b.dataset.a); setTimeout(()=>go(i+1),180); });
     const inp=$('#wzI',v); if(inp){ inp.focus(); inp.select(); inp.onkeydown=e=>{ if(e.key==='Enter'){ if(need()) return; save(readN()); go(i+1); } }; }
-    if($('#wzSug',v)) $('#wzSug',v).onclick=()=>{ $('#wzI',v).value=Math.round(sug*100)/100; $('#wzI',v).focus(); };
+    if($('#wzSug',v)) $('#wzSug',v).onclick=()=>{ $('#wzI',v).value=Math.round(sug/(f.per||1)*100)/100; $('#wzI',v).focus(); };
     const need=()=>{ if(inp&&f.req&&!(Number(inp.value)>0)){ toast('هذا السؤال مطلوب لحساب الدخل',true); inp.focus(); return true; } return false; };
     $('#wzNext',v).onclick=()=>{ if(need()) return; if(inp) save(readN()); else if(!sv.t[f.id]) save(cur); go(i+1); };
     $('#wzBack',v).onclick=()=>{ if(inp) save(readN()); go(i-1); };
