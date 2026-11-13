@@ -1160,6 +1160,8 @@ const r100=x=>Math.round((x||0)/100)*100, r1000=x=>Math.round((x||0)/1000)*1000;
 const WI_FD=[
   {id:'qUnits',g:'q',s:'الوحدات',min:1,l:'كم وحدة قابلة للتأجير؟',u:'وحدة',def:(v,S)=>S.units,src:S=>S.units?'من النظام':''},
   {id:'qRent',g:'q',s:'الإيجار السنوي',min:0,l:'كم متوسط الإيجار السنوي للوحدة؟',u:'ر.س',def:(v,S)=>S.rent,src:S=>S.pricedN?'من إيجارات الوحدات':S.self&&S.rent?'سعر التعادل':''},
+  {id:'auth',g:'q',s:'المسدد للهيئة سنوياً',min:0,l:'كم تدفع للهيئة الملكية سنوياً مقابل الاتفاقية؟',u:'ر.س',def:(v,S)=>S.auth,src:S=>S.auth?'من الاتفاقية':''},
+  {id:'authUp',g:'q',s:'دفعة الاتفاقية المقطوعة',min:0,l:'هل للاتفاقية مبلغ مقطوع للهيئة الملكية (عند التوقيع أو رسوم)؟',u:'ر.س',def:()=>0,hint:'صفر إن لم يوجد'},
   {id:'qOcc',g:'q',s:'الإشغال',min:0,max:100,l:'كم تتوقع نسبة الإشغال بعد الاستقرار؟',u:'%',def:(v,S)=>S.occ||85,src:S=>S.occ?'الإشغال الحالي':''},
   {id:'qRamp',g:'q',s:'الوصول للإشغال',min:0,max:60,l:'كم شهراً يحتاج حتى يصل لهذا الإشغال؟',u:'شهر',def:(v,S)=>S.self&&S.occ&&v.qReady==='yes'?0:12},
   {id:'qCond',g:'q',s:'حالة الأصل',l:'ما حالة الأصل؟',opts:WI_COND,def:()=>'mid'},
@@ -1188,7 +1190,6 @@ const WI_FD=[
   {id:'grace',g:'عرض المستثمر',l:'فترة سماح بدون دفع',u:'شهر',def:(v,S)=>S.self?6:0,hint:'يطلبها المستثمر عادة لفترة التجهيز'},
   {id:'payT',g:'عرض المستثمر',l:'مواعيد سداد المستثمر',opts:WI_PAY,def:()=>'q'},
   // الالتزامات التعاقدية
-  {id:'auth',g:'الالتزامات التعاقدية',l:'التزام الهيئة السنوي',u:'ر.س',def:(v,S)=>S.auth,src:()=>'من الاتفاقية'},
   {id:'authInv',g:'الالتزامات التعاقدية',l:'من يدفع التزام الهيئة عند الإسناد؟',opts:WI_WHO,def:()=>'us'},
   {id:'oblig',g:'الالتزامات التعاقدية',l:'التزامات أخرى علينا سنوياً في كل البدائل',u:'ر.س',def:()=>0,hint:'صيانة إنشائية، تأمين المبنى، رسوم حكومية'},
   // التجديدات والقيمة المتبقية
@@ -1205,9 +1206,25 @@ const WI_FD=[
   {id:'disc',g:'معدل الخصم والزكاة',l:'معدل الخصم (العائد المطلوب على رأس المال)',u:'%',def:()=>8,hint:'تُضاف إليه علاوة مخاطر لكل بديل'},
   {id:'zakat',g:'معدل الخصم والزكاة',l:'الزكاة أو الضريبة على صافي الربح',u:'%',def:()=>2.5,hint:'حسب الانطباق، وصفر إن لم تنطبق'},
 ];
+/* شرح جانبي لكل سؤال: لماذا نسأل، كيف يدخل في الحساب، ونصيحة عملية */
+const WI_WHY={
+  qUnits:['هي أساس الدخل: كل وحدة مؤجرة تضيف إيجاراً.','الدخل الكامل = عدد الوحدات × متوسط الإيجار. ويُستخدم العدد أيضاً لتقدير تكلفة التجهيز والتجديدات لكل وحدة.','احسب الوحدات الجاهزة للتأجير فقط، واستبعد المخصصة لاستخدام داخلي.'],
+  qRent:['يحدد سقف الدخل الذي يمكن أن يحققه الأصل.','يدخل في الدخل الشهري، وينمو كل سنة بنسبة نمو الإيجارات (2% افتراضياً).','استخدم إيجار السوق لوحدات مشابهة في نفس المدينة، لا السعر المأمول.'],
+  auth:['هذا عادة أكبر التزام ثابت، ويُدفع سواء امتلأت الوحدات أو لا.','يُخصم شهرياً من كل البدائل كتكلفة. وعند الإسناد تحدد في الافتراضات التفصيلية من يدفعه: أنت أو المستثمر.','إن كان المقابل يزيد دورياً في الاتفاقية، ضع متوسطه على مدة القرار.'],
+  authUp:['بعض الاتفاقيات فيها دفعة مقدمة أو رسوم عند التوقيع.','تُحسب تكلفةً أولية على كل البدائل بالتساوي، فتظهر في الربحية والعائد والاسترداد، ولا تغيّر المقارنة بينها.','إن كانت مدفوعة سابقاً وتريد تقييم القرار من اليوم، اتركها صفراً لأنها تكلفة لا تتغير بقرارك.'],
+  qOcc:['الإشغال يحدد كم من الدخل الكامل تحققه فعلاً.','يُضرب في الدخل الكامل. واختبار الضغط يقيس أثر نزوله 10 نقاط على القرار.','الإسكان المستقر عادة بين 85% و95%، والتجاري الجديد أقل في أول سنتين.'],
+  qRamp:['الأصل الجديد أو المعاد طرحه لا يمتلئ من أول يوم.','الإشغال يتصاعد تدريجياً خلال هذه الأشهر حتى يصل للنسبة المستهدفة، فيقل دخل السنة الأولى.','صفر إن كان مؤجراً حالياً، ومن 6 إلى 18 شهراً لأصل جديد حسب الطلب.'],
+  qCond:['حالة الأصل تحدد كم ستصرف لتجهيزه وصيانته مستقبلاً.','تحدد التقدير الأولي لتكلفة التجهيز ومدته، وتكلفة التجديدات الرأسمالية وكل كم سنة تتكرر.','تقدر تعدّل هذه التقديرات بدقة من الافتراضات التفصيلية بعد ظهور النتيجة.'],
+  qReady:['إن احتاج الأصل تجهيزاً، فهناك صرف وانتظار قبل أي دخل.','«نعم»: لا تكلفة تجهيز ويبدأ الدخل فوراً. «لا»: تكلفة تجهيز وأشهر بلا دخل في التشغيل الذاتي، ويطلب المستثمر عادة فترة سماح.','التجهيز يشمل التشطيب والأثاث والأنظمة وتسويق الإطلاق.'],
+  qTeam:['التشغيل الذاتي يحتاج فريقاً يؤجر ويحصّل ويتابع الصيانة.','بدون فريق ترتفع علاوة مخاطر التشغيل الذاتي وتنخفض نسبة التحصيل المتوقعة، فيقترب خيار شركة إدارة الأملاك أو المستثمر.','«جزئياً» تعني أن لديك بعض الأدوار وتحتاج تعيين أو تعاقد للباقي.'],
+  qOffer:['عرض المستثمر هو البديل المضمون للتشغيل الذاتي.','نحسب دفعاته مع الزيادة الدورية وفترة السماح ونقارنها بالتشغيل الذاتي. إن تركته صفراً نحسب لك أقل عرض يستحق القبول.','قارن العروض على نفس الشروط: الزيادة الدورية، فترة السماح، ومن يدفع للهيئة الملكية.'],
+  qCash:['حتى المشروع الرابح قد يتعثر إن نفدت السيولة قبل استقرار الدخل.','نقارنها بأقصى احتياج سيولة في التشغيل الذاتي (التجهيز + أشهر الانتظار + الالتزامات)، وننبهك إن لم تكفِ.','صفر يعني تجاهل هذا الاختبار.'],
+  qH:['هي الأفق الزمني الذي نقارن عليه البدائل.','صافي الربح والقيمة الحالية والاسترداد كلها تُحسب على هذه المدة.','اجعلها مساوية للمدة المتبقية من الاتفاقية مع الهيئة الملكية، أو لمدة عقد المستثمر المقترح.'],
+  qRisk:['نفس الأرقام قد تناسب جهة ولا تناسب أخرى.','عند تقارب البدائل نختار الأقل مخاطرة: المتحفظ يقبل فرقاً حتى 20%، والمتوازن 10%، والمرن 3%.','إن كان الدخل الثابت أهم لك من تعظيم الربح، اختر «متحفظ».']
+};
 const WI_BY=Object.fromEntries(WI_FD.map(f=>[f.id,f]));
 /* المدخلات المالية الاثنا عشر ومدى اكتمال كل منها */
-const WI_CHECK=[['مدة الاستثمار',['qH','setupM','qRamp']],['الاستثمار الأولي',['setup','invCost']],['إيرادات التشغيل الذاتي',['qUnits','qRent','qOcc','rGrow','coll']],['تكاليف التشغيل',['fixed','varPct','cGrow']],['عرض المستثمر',['qOffer','esc','escN','grace','payT']],['الالتزامات التعاقدية',['auth','authInv','oblig']],['التجديدات الرأسمالية',['renew','renewN','renewInv']],['معدل الخصم',['disc']],['القيمة المتبقية',['resid']],['السيولة التشغيلية',['wc','qCash']],['التمويل',['fin','finR','finY']],['الزكاة والضرائب',['zakat']]];
+const WI_CHECK=[['مدة الاستثمار',['qH','setupM','qRamp']],['الاستثمار الأولي',['setup','invCost','authUp']],['إيرادات التشغيل الذاتي',['qUnits','qRent','qOcc','rGrow','coll']],['تكاليف التشغيل',['fixed','varPct','cGrow']],['عرض المستثمر',['qOffer','esc','escN','grace','payT']],['الالتزامات التعاقدية',['auth','authInv','oblig']],['التجديدات الرأسمالية',['renew','renewN','renewInv']],['معدل الخصم',['disc']],['القيمة المتبقية',['resid']],['السيولة التشغيلية',['wc','qCash']],['التمويل',['fin','finR','finY']],['الزكاة والضرائب',['zakat']]];
 function wiSaved(k){ const all=Store.data.wiStudies||(Store.data.wiStudies={}); return all[k.id]||(all[k.id]={v:{},t:{}}); }
 function wiVals(k){ const S=wiSys(k), sv=wiSaved(k), v={}; WI_FD.forEach(f=>{ v[f.id]=sv.t[f.id]?sv.v[f.id]:f.def(v,S); }); return {S,v,sv}; }
 /* المحاكاة الشهرية لبديل واحد. over = تعديلات مؤقتة لاختبار الضغط */
@@ -1215,6 +1232,7 @@ function wiSim(V,opt,over){ const v=Object.assign({},V,over||{}), H=Math.max(1,M
   const rows=[...Array(H)].map((_,i)=>({y:i+1,rev:0,opex:0,fee:0,auth:0,capex:0,fin:0,zakat:0,profit:0,interest:0}));
   const yi=m=>Math.min(H-1,Math.max(0,Math.ceil(m/12)-1)), add=(m,key,x)=>{ m=Math.max(0,Math.min(N,m)); cf[m]+=x; rows[yi(m)][key]+=x; };
   const full=v.qUnits*v.qRent, occS=Math.max(0,Math.min(100,v.qOcc))/100, g=y=>Math.pow(1+v.cGrow/100,y);
+  add(0,'auth',-(v.authUp||0));
   for(let m=1;m<=N;m++){ add(m,'auth',-(opt==='inv'&&v.authInv==='inv'?0:v.auth)/12); add(m,'auth',-v.oblig/12); }
   if(opt==='inv'){
     add(0,'capex',-v.invCost);
@@ -1288,13 +1306,21 @@ M.whatif={key:'whatif',label:'دراسة الفرص',icon:'🔍',group:'الرئ
     $('#wiReset',v).onclick=()=>ask('ستعود كل إجابات وافتراضات هذه الاتفاقية للقيم التلقائية، وتبدأ الأسئلة من جديد.',()=>{ delete Store.data.wiStudies[k.id]; Store.save(); st.opt=''; st.stepK=''; M.whatif.render(v); },'إعادة الدراسة'); };
   const disp=f=>{ const x=val[f.id]; if(f.opts) return f.opts[x]?.l||'—'; if(!x&&(f.id==='qOffer'||f.id==='qCash')) return f.id==='qOffer'?'لا يوجد':'غير محددة'; if(f.id==='qH') return wiYrs(x); if(f.id==='qRamp') return x?`${x} شهر`:'فوري'; return `${Number(x).toLocaleString('en-US')} ${f.u||''}`; };
   if(st.step!=null){ const i=Math.max(0,Math.min(Q.length-1,st.step)), f=Q[i], cur=val[f.id], sug=f.def(val,S), from=f.src&&f.src(S);
-    v.innerHTML=`${toolbar}<div class="card wiz"><div class="wzp"><span>السؤال ${i+1} من ${Q.length}</span><div class="bar gold"><i style="width:${Math.round((i+1)/Q.length*100)}%"></i></div></div>
+    const W=WI_WHY[f.id]||[], full=val.qUnits*val.qRent, occI=Q.findIndex(q=>q.id==='qOcc'), atOcc=full*(val.qOcc/100);
+    const side=`<aside class="card wzside"><h4>لماذا نسأل؟</h4><p>${esc(W[0]||'')}</p><h4>كيف يدخل في الحساب</h4><p>${esc(W[1]||'')}</p>${W[2]?`<h4>نصيحة</h4><p>${esc(W[2])}</p>`:''}
+      <div class="wzlive"><div class="small muted">حسب إجاباتك حتى الآن (سنوياً)</div>
+        <div><span>الدخل الكامل</span><b>${short(full)}</b></div>
+        <div><span>الدخل بإشغال ${val.qOcc}%</span><b>${short(atOcc)}</b></div>
+        <div><span>المسدد للهيئة الملكية</span><b class="neg">${val.auth?'-'+short(val.auth):'0'}</b></div>
+        <div class="tot"><span>المتبقي قبل التشغيل</span><b class="${atOcc-val.auth<0?'neg':''}">${short(atOcc-val.auth)}</b></div>
+        ${val.authUp?`<div><span>دفعة مقطوعة للهيئة</span><b class="neg">-${short(val.authUp)}</b></div>`:''}</div></aside>`;
+    v.innerHTML=`${toolbar}<div class="wizw"><div class="card wiz"><div class="wzp"><span>السؤال ${i+1} من ${Q.length}</span><div class="bar gold"><i style="width:${Math.round((i+1)/Q.length*100)}%"></i></div></div>
       <div class="wzdots">${Q.map((q,j)=>`<button type="button" class="${j===i?'on':''} ${sv.t[q.id]?'ok':''}" data-j="${j}" title="${esc(q.s)}" aria-label="${esc(q.s)}"></button>`).join('')}</div>
       <h2 class="wzq">${esc(f.l)}</h2>${f.hint?`<p class="muted wzh">${esc(f.hint)}</p>`:''}
       ${f.opts?`<div class="wzo">${Object.entries(f.opts).map(([a,o])=>`<button type="button" class="wzb ${cur===a?'on':''}" data-a="${a}">${o.l}</button>`).join('')}</div>`
         :`<div class="wzn"><input id="wzI" type="number" inputmode="decimal" ${f.min!=null?`min="${f.min}"`:''} ${f.max!=null?`max="${f.max}"`:''} value="${Math.round(cur*100)/100}"><span>${f.u||''}</span></div>
         <div class="small muted wzs">المقترح: <b>${Number(sug).toLocaleString('en-US')} ${f.u||''}</b>${from?` · ${from}`:''} ${sug!==cur?`<button type="button" class="lnk" id="wzSug">استخدمه</button>`:''}</div>`}
-      <div class="wzf"><button class="btn" id="wzBack" ${i?'':'disabled'}>السابق</button><span class="sp"></span>${sv.done?'<button class="btn" id="wzRes">النتيجة مباشرة</button>':''}<button class="btn p" id="wzNext">${i===Q.length-1?'عرض النتيجة':'التالي'}</button></div></div>`;
+      <div class="wzf"><button class="btn" id="wzBack" ${i?'':'disabled'}>السابق</button><span class="sp"></span>${sv.done?'<button class="btn" id="wzRes">النتيجة مباشرة</button>':''}<button class="btn p" id="wzNext">${i===Q.length-1?'عرض النتيجة':'التالي'}</button></div></div>${side}</div>`;
     bindTop();
     const save=x=>{ sv.v[f.id]=x; sv.t[f.id]=1; }, go=j=>{ if(j>=Q.length){ sv.done=1; st.step=null; } else st.step=Math.max(0,j); Store.save(); M.whatif.render(v); window.scrollTo({top:0,behavior:'smooth'}); };
     const readN=()=>{ let x=Number($('#wzI',v).value); if(!isFinite(x)) x=0; if(f.min!=null) x=Math.max(f.min,x); if(f.max!=null) x=Math.min(f.max,x); return x; };
@@ -1318,7 +1344,7 @@ M.whatif={key:'whatif',label:'دراسة الفرص',icon:'🔍',group:'الرئ
     <div class="wbig">${short(x.val)}</div><div class="small muted">القيمة الحالية الصافية بعد علاوة المخاطر (${wiRate(val,o).toFixed(1)}%)</div>
     <dl><dt>صافي الربح على ${wiYrs(x.H)}</dt><dd>${short(x.total)}</dd><dt>صافي السنة الأولى</dt><dd>${short(x.y1)}</dd><dt>متوسط الربح السنوي</dt><dd>${short(x.avgProfit)}</dd><dt>العائد الداخلي</dt><dd>${o==='inv'&&!val.invCost?'بلا استثمار':irrT(x.irr)}</dd><dt>أقصى احتياج سيولة</dt><dd>${x.peak<0?short(-x.peak):'لا يوجد'}</dd><dt>فترة الاسترداد</dt><dd>${wiPb(x)}</dd><dt>المخاطر علينا</dt><dd>${WI_OPTS[o].risk}</dd></dl>`}</button>`; };
   const STRESS=[['الإشغال أقل بـ10 نقاط',{qOcc:val.qOcc-10}],['الإيجار أقل 10%',{qRent:val.qRent*0.9}],['التكاليف أعلى 15%',{fixed:val.fixed*1.15,varPct:val.varPct*1.15}],['تأخر بدء الإيرادات 6 أشهر',{setupM:val.setupM+6}],['التحصيل 85%',{coll:Math.min(val.coll,85)}],['العائد المطلوب +2%',{disc:val.disc+2}]].map(([l,o])=>{ const d=wiDecide(val,o); return {l,team:d.R.team.val,pm:d.R.pm.val,inv:d.R.inv.val,best:d.best}; });
-  const sel=R[st.opt], rowsT=[['الإيرادات المحصّلة','rev'],['تكاليف التشغيل','opex'],['أتعاب شركة الإدارة','fee'],['التزام الهيئة والالتزامات الأخرى','auth'],['التجهيز والتجديدات والسيولة','capex'],['التمويل (سحب وسداد)','fin'],['الزكاة والضرائب','zakat']].filter(([,key])=>sel.rows.some(r=>Math.abs(r[key])>0.5));
+  const sel=R[st.opt], rowsT=[['الإيرادات المحصّلة','rev'],['تكاليف التشغيل','opex'],['أتعاب شركة الإدارة','fee'],['المسدد للهيئة الملكية والالتزامات الأخرى','auth'],['التجهيز والتجديدات والسيولة','capex'],['التمويل (سحب وسداد)','fin'],['الزكاة والضرائب','zakat']].filter(([,key])=>sel.rows.some(r=>Math.abs(r[key])>0.5));
   v.innerHTML=`${toolbar}
   <div class="card mb"><div class="wsumh"><h3>إجاباتك</h3><span class="small muted">اضغط أي إجابة لتعديلها</span><span class="sp"></span><button class="btn sm" id="wzRe">مراجعة الأسئلة من البداية</button></div>
     <div class="wsum">${Q.map((f,j)=>`<button type="button" class="wchip" data-j="${j}"><span>${esc(f.s)}</span><b>${esc(disp(f))}</b></button>`).join('')}</div></div>

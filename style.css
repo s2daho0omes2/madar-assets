@@ -290,7 +290,7 @@ details.card summary::before{content:"▸ ";color:var(--gold)} details.card[open
 h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 
 /* دراسة الفرص: بطاقات الأسئلة */
-.wiz{max-width:720px;margin:24px auto;padding:28px clamp(18px,4vw,40px) 24px;display:flex;flex-direction:column;gap:16px}
+.wiz{margin:0;padding:28px clamp(18px,4vw,40px) 24px;display:flex;flex-direction:column;gap:16px}
 .wzp{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--muted);white-space:nowrap} .wzp .bar{flex:1}
 .wzdots{display:flex;gap:6px;flex-wrap:wrap}
 .wzdots button{all:unset;cursor:pointer;width:22px;height:6px;border-radius:4px;background:var(--sand-2)}
@@ -311,3 +311,15 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .wchip{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
 .wchip span{font-size:12px;color:var(--muted)} .wchip b{font-size:14px}
 .wchip:hover{border-color:var(--gold)} .wchip:focus-visible{outline:2px solid var(--gold)}
+
+.wizw{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:18px;max-width:1100px;margin:24px auto;align-items:start}
+@media (max-width:900px){.wizw{grid-template-columns:1fr}}
+.wzside{display:flex;flex-direction:column;gap:6px;border-inline-start:4px solid var(--gold);animation:wzIn .35s ease}
+.wzside h4{margin:8px 0 0;font-size:13px;color:var(--gold)} .wzside h4:first-child{margin-top:0}
+.wzside p{margin:0;font-size:14.5px;line-height:1.75}
+.wzlive{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:6px}
+.wzlive>div:not(.small){display:flex;justify-content:space-between;gap:10px;font-size:13.5px} .wzlive b{font-variant-numeric:tabular-nums}
+.wzlive .tot{border-top:1px solid var(--line);padding-top:6px;font-weight:700} .wzlive .neg{color:var(--red)}
+.wiz{animation:wzIn .3s ease}
+@keyframes wzIn{from{opacity:.4;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.wiz,.wzside{animation:none}}
