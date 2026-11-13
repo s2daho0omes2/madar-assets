@@ -1336,6 +1336,7 @@ M.whatif={key:'whatif',label:'دراسة وتحليل الفرصة',icon:'🔍',
     <div class="wbig">${short(x.val)}</div><div class="small muted">القيمة الحالية الصافية بعد علاوة المخاطر (${wiRate(val,o).toFixed(1)}%)</div>
     <dl><dt>صافي الربح على ${wiYrs(x.H)}</dt><dd>${short(x.total)}</dd><dt>صافي السنة الأولى</dt><dd>${short(x.y1)}</dd><dt>متوسط الربح السنوي</dt><dd>${short(x.avgProfit)}</dd><dt>العائد الداخلي</dt><dd>${o==='inv'&&!val.invCost?'بلا استثمار':irrT(x.irr)}</dd><dt>أقصى احتياج سيولة</dt><dd>${x.peak<0?short(-x.peak):'لا يوجد'}</dd><dt>فترة الاسترداد</dt><dd>${wiPb(x)}</dd><dt>المخاطر علينا</dt><dd>${WI_OPTS[o].risk}</dd></dl>`}</button>`; };
   const STRESS=[['الإشغال أقل بـ10 نقاط',{qOcc:val.qOcc-10}],['الإيجار أقل 10%',{qRent:val.qRent*0.9}],['التكاليف أعلى 15%',{fixed:val.fixed*1.15,varPct:val.varPct*1.15,maint:val.maint*1.15}],['الصيانة أعلى 30%',{maint:val.maint*1.3}],['تأخر بدء الإيرادات 6 أشهر',{setupM:val.setupM+6}],['التحصيل 85%',{coll:Math.min(val.coll,85)}],['العائد المطلوب +2%',{disc:val.disc+2}]].map(([l,o])=>{ const d=wiDecide(val,o); return {l,team:d.R.team.val,inv:d.R.inv.val,best:d.best}; });
+  const REC_OK=val.qUnits>0&&val.qRent>0, RI=val.qOffer?R.inv:wiSim(val,'inv',{qOffer:A.minOffer||0});
   const sel=R[st.opt], rowsT=[['الإيرادات المحصّلة','rev'],['عقد الصيانة والإصلاحات','maint'],['تكاليف التشغيل الأخرى','opex'],['المسدد للهيئة الملكية والالتزامات الأخرى','auth'],['التجهيز والتجديدات والسيولة','capex'],['التمويل (سحب وسداد)','fin'],['الزكاة والضرائب','zakat']].filter(([,key])=>sel.rows.some(r=>Math.abs(r[key])>0.5));
   v.innerHTML=`${toolbar}
   <div class="card mb"><div class="wsumh"><h3>إجاباتك</h3><span class="small muted">اضغط أي إجابة لتعديلها</span><span class="sp"></span><button class="btn sm" id="wzRe">مراجعة الأسئلة من البداية</button></div>
@@ -1345,6 +1346,14 @@ M.whatif={key:'whatif',label:'دراسة وتحليل الفرصة',icon:'🔍',
     <div class="grid g2 wrec"><div><div class="small muted" style="margin-bottom:6px">لماذا</div><ul class="why">${A.why.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>
     <div><div class="small muted" style="margin-bottom:6px">الخطوات المقترحة</div><ol class="why">${A.plan.map(w=>`<li>${esc(w)}</li>`).join('')}</ol></div></div>
   </div>
+  ${REC_OK?`<div class="card mb"><h3>النتيجة بالرسم <span class="small muted">${val.qOffer?'مقارنة النموذجين سنة بسنة':'لم يصلك عرض، فخط الإسناد محسوب على أقل عرض مقبول ('+num(Math.round(A.minOffer||0))+' ر.س سنوياً)'}</span></h3>
+    <div class="grid g2" style="margin-top:6px">
+      <div><div class="wct">صافي الربح كل سنة</div><div class="chart"><canvas id="wiB"></canvas></div></div>
+      <div><div class="wct">الربح المتراكم حتى نهاية المدة</div><div class="chart"><canvas id="wiC"></canvas></div></div>
+    </div>
+    <div class="wcsum"><div><span><i style="background:${WI_OPTS.team.c}"></i>التشغيل الذاتي</span><b class="${R.team.total<0?'neg':''}">${short(R.team.total)}</b><small>مجموع الربح على ${wiYrs(R.team.H)}</small></div>
+      <div><span><i style="background:${WI_OPTS.inv.c}"></i>${val.qOffer?'الإسناد لمستثمر':'الإسناد بأقل عرض مقبول'}</span><b class="${RI.total<0?'neg':''}">${short(RI.total)}</b><small>مجموع الربح على ${wiYrs(RI.H)}</small></div>
+      <div><span>الفرق لصالح ${R.team.total>=RI.total?'التشغيل الذاتي':'الإسناد'}</span><b>${short(Math.abs(R.team.total-RI.total))}</b><small>قبل احتساب المخاطر</small></div></div></div>`:''}
   <div class="grid g2 mb wopts">${['team','inv'].map(optCard).join('')}</div>
   <div class="grid g2 mb">
     <div class="card"><h3>اختبار الضغط <span class="small muted">القيمة الحالية لكل بديل لو تغيّر افتراض واحد</span></h3><div class="twrap"><table class="tbl wit"><thead><tr><th>السيناريو</th><th>🏠 التشغيل الذاتي</th><th>🤝 الإسناد لمستثمر</th><th>التوصية</th></tr></thead><tbody>
@@ -1362,7 +1371,6 @@ M.whatif={key:'whatif',label:'دراسة وتحليل الفرصة',icon:'🔍',
       <tr class="net"><td>صافي التدفق</td>${sel.rows.map(r=>`<td class="${r.net<0?'neg':''}">${num(Math.round(r.net))}</td>`).join('')}<td><b>${num(Math.round(sel.total))}</b></td></tr>
       <tr class="net"><td>الرصيد التراكمي</td>${sel.rows.map(r=>`<td class="${r.cum<0?'neg':''}">${num(Math.round(r.cum))}</td>`).join('')}<td></td></tr>
     </tbody></table></div>
-    <div class="chart" style="margin-top:14px"><canvas id="wiC"></canvas></div>
     <div class="small muted" style="margin-top:8px">النموذج شهري: التجهيز يُصرف على أشهره، الإشغال يتصاعد حتى يستقر، الإيجار والتكاليف تنمو سنوياً، دفعات المستثمر حسب مواعيدها بعد فترة السماح، والزكاة تُحسب على ربح كل سنة. السيولة التشغيلية تُحجز عند البدء وتعود بالنهاية، والقيمة المتبقية تُضاف في آخر شهر.</div>
   </details>`;
   bindTop(); $('#wzRe',v).onclick=()=>{ st.step=0; M.whatif.render(v); window.scrollTo({top:0,behavior:'smooth'}); };
@@ -1370,7 +1378,9 @@ M.whatif={key:'whatif',label:'دراسة وتحليل الفرصة',icon:'🔍',
   v.querySelectorAll('[data-w]').forEach(i=>i.onchange=()=>{ const f=WI_BY[i.dataset.w]; sv.v[f.id]=f.opts?i.value:(Number(i.value)||0); sv.t[f.id]=1; Store.save(); M.whatif.render(v); });
   v.querySelectorAll('[data-opt]').forEach(b=>b.onclick=()=>{ st.opt=b.dataset.opt; const d=v.querySelector('details[data-d="cf"]'); M.whatif.render(v); const n=v.querySelector('details[data-d="cf"]'); n.open=true; n.scrollIntoView({behavior:'smooth',block:'start'}); });
   const yl=['الآن',...sel.rows.map(r=>`سنة ${r.y}`)];
-  Charts.make('wiC','line',yl,['team','inv'].filter(o=>o!=='inv'||val.qOffer).map(o=>({label:WI_OPTS[o].l,data:[Math.round(R[o].cum[0]),...R[o].rows.map(r=>Math.round(r.cum))],color:WI_OPTS[o].c,fill:false,borderWidth:o===D.best?3.5:2})));
+  if(REC_OK){ const ser=[{o:'team',r:R.team},{o:'inv',r:RI}];
+    Charts.make('wiB','bar',sel.rows.map(r=>`سنة ${r.y}`),ser.map(x=>({label:x.o==='inv'&&!val.qOffer?'الإسناد بأقل عرض مقبول':WI_OPTS[x.o].l,data:x.r.rows.map(r=>Math.round(r.net)),color:WI_OPTS[x.o].c})));
+    Charts.make('wiC','line',yl,ser.map(x=>({label:x.o==='inv'&&!val.qOffer?'الإسناد بأقل عرض مقبول':WI_OPTS[x.o].l,data:[Math.round(x.r.cum[0]),...x.r.rows.map(r=>Math.round(r.cum))],color:WI_OPTS[x.o].c,fill:false,pointRadius:3,borderWidth:x.o===D.best?4:2.5,borderDash:x.o==='inv'&&!val.qOffer?[6,5]:[]}))); }
 }};
 
 /* ───── معالج إضافة مشروع جديد: سؤال بسؤال، ثم يُنشئ المشروع والمباني والوحدات والاتفاقية دفعة واحدة ───── */
