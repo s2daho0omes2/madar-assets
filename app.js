@@ -1160,7 +1160,6 @@ const WI_FD=[
   {id:'qUnits',g:'q',s:'الوحدات',min:1,req:1,l:'كم وحدة قابلة للتأجير؟',u:'وحدة',def:(v,S)=>S.units,src:S=>S.units?'من النظام':''},
   {id:'qRent',g:'q',s:'الإيجار السنوي',min:0,req:1,l:'كم متوسط الإيجار السنوي للوحدة؟',u:'ر.س',def:(v,S)=>S.rent,src:S=>S.pricedN?'من إيجارات الوحدات':S.self&&S.rent?'سعر التعادل':''},
   {id:'auth',g:'q',s:'المسدد للهيئة سنوياً',min:0,l:'كم تدفع للهيئة الملكية سنوياً مقابل الاتفاقية؟',u:'ر.س',def:(v,S)=>S.auth,src:S=>S.auth?'من الاتفاقية':''},
-  {id:'authUp',g:'q',s:'دفعة الاتفاقية المقطوعة',min:0,l:'هل للاتفاقية مبلغ مقطوع للهيئة الملكية (عند التوقيع أو رسوم)؟',u:'ر.س',def:()=>0,hint:'صفر إن لم يوجد'},
   {id:'qOcc',g:'q',s:'الإشغال',min:0,max:100,l:'كم تتوقع نسبة الإشغال بعد الاستقرار؟',u:'%',def:()=>85,src:S=>S.occ?'الإشغال الحالي':''},
   {id:'qRamp',g:'q',s:'الوصول للإشغال',min:0,max:60,l:'كم شهراً يحتاج حتى يصل لهذا الإشغال؟',u:'شهر',def:v=>v.qReady==='yes'?6:12},
   {id:'qCond',g:'q',s:'حالة الأصل',l:'ما حالة الأصل؟',opts:WI_COND,def:()=>'mid'},
@@ -1210,7 +1209,6 @@ const WI_WHY={
   qUnits:['هي أساس الدخل: كل وحدة مؤجرة تضيف إيجاراً.','الدخل الكامل = عدد الوحدات × متوسط الإيجار. ويُستخدم العدد أيضاً لتقدير تكلفة التجهيز والتجديدات لكل وحدة.','احسب الوحدات الجاهزة للتأجير فقط، واستبعد المخصصة لاستخدام داخلي.'],
   qRent:['يحدد سقف الدخل الذي يمكن أن يحققه الأصل.','يدخل في الدخل الشهري، وينمو كل سنة بنسبة نمو الإيجارات (2% افتراضياً).','استخدم إيجار السوق لوحدات مشابهة في نفس المدينة، لا السعر المأمول.'],
   auth:['هذا عادة أكبر التزام ثابت، ويُدفع سواء امتلأت الوحدات أو لا.','يُخصم شهرياً من كل البدائل كتكلفة. وعند الإسناد تحدد في الافتراضات التفصيلية من يدفعه: أنت أو المستثمر.','إن كان المقابل يزيد دورياً في الاتفاقية، ضع متوسطه على مدة القرار.'],
-  authUp:['بعض الاتفاقيات فيها دفعة مقدمة أو رسوم عند التوقيع.','تُحسب تكلفةً أولية على كل البدائل بالتساوي، فتظهر في الربحية والعائد والاسترداد، ولا تغيّر المقارنة بينها.','إن كانت مدفوعة سابقاً وتريد تقييم القرار من اليوم، اتركها صفراً لأنها تكلفة لا تتغير بقرارك.'],
   qOcc:['الإشغال يحدد كم من الدخل الكامل تحققه فعلاً.','يُضرب في الدخل الكامل. واختبار الضغط يقيس أثر نزوله 10 نقاط على القرار.','الإسكان المستقر عادة بين 85% و95%، والتجاري الجديد أقل في أول سنتين.'],
   qRamp:['الأصل الجديد أو المعاد طرحه لا يمتلئ من أول يوم.','الإشغال يتصاعد تدريجياً خلال هذه الأشهر حتى يصل للنسبة المستهدفة، فيقل دخل السنة الأولى.','صفر إن كان مؤجراً حالياً، ومن 6 إلى 18 شهراً لأصل جديد حسب الطلب.'],
   qCond:['حالة الأصل تحدد كم ستصرف لتجهيزه وصيانته مستقبلاً.','تحدد التقدير الأولي لتكلفة التجهيز ومدته، وتكلفة التجديدات الرأسمالية وكل كم سنة تتكرر.','تقدر تعدّل هذه التقديرات بدقة من الافتراضات التفصيلية بعد ظهور النتيجة.'],
@@ -1223,7 +1221,7 @@ const WI_WHY={
 };
 const WI_BY=Object.fromEntries(WI_FD.map(f=>[f.id,f]));
 /* المدخلات المالية الاثنا عشر ومدى اكتمال كل منها */
-const WI_CHECK=[['مدة الاستثمار',['qH','setupM','qRamp']],['الاستثمار الأولي',['setup','invCost','authUp']],['إيرادات التشغيل الذاتي',['qUnits','qRent','qOcc','rGrow','coll']],['تكاليف التشغيل',['fixed','varPct','cGrow']],['عرض المستثمر',['qOffer','esc','escN','grace','payT']],['الالتزامات التعاقدية',['auth','authInv','oblig']],['التجديدات الرأسمالية',['renew','renewN','renewInv']],['معدل الخصم',['disc']],['القيمة المتبقية',['resid']],['السيولة التشغيلية',['wc','qCash']],['التمويل',['fin','finR','finY']],['الزكاة والضرائب',['zakat']]];
+const WI_CHECK=[['مدة الاستثمار',['qH','setupM','qRamp']],['الاستثمار الأولي',['setup','invCost']],['إيرادات التشغيل الذاتي',['qUnits','qRent','qOcc','rGrow','coll']],['تكاليف التشغيل',['fixed','varPct','cGrow']],['عرض المستثمر',['qOffer','esc','escN','grace','payT']],['الالتزامات التعاقدية',['auth','authInv','oblig']],['التجديدات الرأسمالية',['renew','renewN','renewInv']],['معدل الخصم',['disc']],['القيمة المتبقية',['resid']],['السيولة التشغيلية',['wc','qCash']],['التمويل',['fin','finR','finY']],['الزكاة والضرائب',['zakat']]];
 function wiSaved(){ const all=Store.data.wiStudies||(Store.data.wiStudies={}); return all[WI_KEY]||(all[WI_KEY]={v:{},t:{}}); }
 function wiVals(){ const S=wiSys(), sv=wiSaved(), v={}; WI_FD.forEach(f=>{ v[f.id]=sv.t[f.id]?sv.v[f.id]:f.def(v,S); }); return {S,v,sv}; }
 /* المحاكاة الشهرية لبديل واحد. over = تعديلات مؤقتة لاختبار الضغط */
@@ -1231,7 +1229,6 @@ function wiSim(V,opt,over){ const v=Object.assign({},V,over||{}), H=Math.max(1,M
   const rows=[...Array(H)].map((_,i)=>({y:i+1,rev:0,opex:0,fee:0,auth:0,capex:0,fin:0,zakat:0,profit:0,interest:0}));
   const yi=m=>Math.min(H-1,Math.max(0,Math.ceil(m/12)-1)), add=(m,key,x)=>{ m=Math.max(0,Math.min(N,m)); cf[m]+=x; rows[yi(m)][key]+=x; };
   const full=v.qUnits*v.qRent, occS=Math.max(0,Math.min(100,v.qOcc))/100, g=y=>Math.pow(1+v.cGrow/100,y);
-  add(0,'auth',-(v.authUp||0));
   for(let m=1;m<=N;m++){ add(m,'auth',-(opt==='inv'&&v.authInv==='inv'?0:v.auth)/12); add(m,'auth',-v.oblig/12); }
   if(opt==='inv'){
     add(0,'capex',-v.invCost);
@@ -1301,7 +1298,7 @@ M.whatif={key:'whatif',label:'دراسة الفرص',icon:'🔍',group:'الرئ
   const Q=WI_FD.filter(f=>f.g==='q'); if(st.step===undefined) st.step=sv.done?null:0;
   const toolbar=`<div class="toolbar"><span class="muted">حلّل أي مشروع جديد: أجب عن الأسئلة، ويقترح لك طريقة التشغيل الأنسب وأرقامها.</span><span class="sp"></span><button class="btn sm" id="wiReset">↺ دراسة مشروع جديد</button></div>`;
   const bindTop=()=>{ $('#wiReset',v).onclick=()=>ask('ستُمسح إجابات الدراسة الحالية وتبدأ الأسئلة من جديد لمشروع آخر.',()=>{ delete Store.data.wiStudies[WI_KEY]; Store.save(); st.opt=''; st.step=0; M.whatif.render(v); },'دراسة جديدة'); };
-  const disp=f=>{ const x=val[f.id]; if(f.opts) return f.opts[x]?.l||'—'; if(!x&&['qOffer','qCash','authUp'].includes(f.id)) return f.id==='qCash'?'غير محددة':'لا يوجد'; if(f.id==='qH') return wiYrs(x); if(f.id==='qRamp') return x?`${x} شهر`:'فوري'; return `${Number(x).toLocaleString('en-US')} ${f.u||''}`; };
+  const disp=f=>{ const x=val[f.id]; if(f.opts) return f.opts[x]?.l||'—'; if(!x&&['qOffer','qCash'].includes(f.id)) return f.id==='qCash'?'غير محددة':'لا يوجد'; if(f.id==='qH') return wiYrs(x); if(f.id==='qRamp') return x?`${x} شهر`:'فوري'; return `${Number(x).toLocaleString('en-US')} ${f.u||''}`; };
   if(st.step!=null){ const i=Math.max(0,Math.min(Q.length-1,st.step)), f=Q[i], cur=val[f.id], sug=f.def(val,S), from=f.src&&f.src(S);
     const W=WI_WHY[f.id]||[], full=val.qUnits*val.qRent, occI=Q.findIndex(q=>q.id==='qOcc'), atOcc=full*(val.qOcc/100);
     const side=`<aside class="card wzside"><h4>لماذا نسأل؟</h4><p>${esc(W[0]||'')}</p><h4>كيف يدخل في الحساب</h4><p>${esc(W[1]||'')}</p>${W[2]?`<h4>نصيحة</h4><p>${esc(W[2])}</p>`:''}
@@ -1309,8 +1306,7 @@ M.whatif={key:'whatif',label:'دراسة الفرص',icon:'🔍',group:'الرئ
         <div><span>الدخل الكامل</span><b>${short(full)}</b></div>
         <div><span>الدخل بإشغال ${val.qOcc}%</span><b>${short(atOcc)}</b></div>
         <div><span>المسدد للهيئة الملكية</span><b class="neg">${val.auth?'-'+short(val.auth):'0'}</b></div>
-        <div class="tot"><span>المتبقي قبل التشغيل</span><b class="${atOcc-val.auth<0?'neg':''}">${short(atOcc-val.auth)}</b></div>
-        ${val.authUp?`<div><span>دفعة مقطوعة للهيئة</span><b class="neg">-${short(val.authUp)}</b></div>`:''}</div></aside>`;
+        <div class="tot"><span>المتبقي قبل التشغيل</span><b class="${atOcc-val.auth<0?'neg':''}">${short(atOcc-val.auth)}</b></div></div></aside>`;
     v.innerHTML=`${toolbar}<div class="wizw"><div class="card wiz"><div class="wzp"><span>السؤال ${i+1} من ${Q.length}</span><div class="bar gold"><i style="width:${Math.round((i+1)/Q.length*100)}%"></i></div></div>
       <div class="wzdots">${Q.map((q,j)=>`<button type="button" class="${j===i?'on':''} ${sv.t[q.id]?'ok':''}" data-j="${j}" title="${esc(q.s)}" aria-label="${esc(q.s)}"></button>`).join('')}</div>
       <h2 class="wzq">${esc(f.l)}</h2>${f.hint?`<p class="muted wzh">${esc(f.hint)}</p>`:''}
