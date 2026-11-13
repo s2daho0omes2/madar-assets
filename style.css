@@ -481,3 +481,5 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .wrc-steps i{background:#16242f;color:#f1ede4;font-variant-numeric:tabular-nums;z-index:1}
 :root[data-theme="dark"] .wrc-steps i{background:var(--gold);color:#16242f}
 .wrc-steps li:not(:last-child)::before{content:"";position:absolute;inset-inline-start:12px;top:28px;bottom:-12px;width:2px;background:var(--line)}
+
+.wzlive .sub{font-size:12px;color:var(--muted);margin-top:6px;display:block}
