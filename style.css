@@ -338,3 +338,5 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .nprow span{color:var(--muted)} .nprow b{text-align:end}
 .np-rec{margin:0}
 .wzn input[type=text],.wzn input[type=date]{font-size:22px}
+
+.phx{display:flex;align-items:center;gap:8px;flex-wrap:wrap}

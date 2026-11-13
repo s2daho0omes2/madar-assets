@@ -575,14 +575,14 @@ function agCard(k){ const p=agreementPL(k), o=agreementOps(k), inv=k.type==='م�
     ${inv?reqBlock(k):(()=>{ const st=meterStats(Store.coll('meters').filter(m=>meterAg(m)?.id===k.id)); return st.count?`<div class="small" style="margin-top:10px">⚡💧 <b>${st.count}</b> عداد · تكلفة 12 شهر ${num(st.cost12)} · ${st.unpaidN?`<span class="pill ${st.lateN?'bad':'warn'}">غير مسدد ${num(st.unpaidAmt)}</span>`:'<span class="pill ok">الفواتير مسددة</span>'}</div>`:''; })()}
     ${k.scope?`<div class="small" style="margin-top:10px"><span class="muted">نطاق العمل:</span> ${esc(k.scope)}</div>`:''}
   </div>`; }
-function bindAgCards(root){ root.querySelectorAll('.reqbox[data-req]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); reqEditor(b.dataset.req,()=>App.render()); }); root.querySelectorAll('.agcard[data-k]').forEach(c=>c.onclick=()=>{ const k=Store.get('contracts',c.dataset.k); const a=Store.get('assets',k?.assetId); if(a) assetDetail(a); }); }
+function bindAgCards(root){ root.querySelectorAll('[data-np]').forEach(b=>b.onclick=()=>{ NPView.a={model:b.dataset.np,fixed:1}; NPView.step=0; location.hash='#newproject'; }); root.querySelectorAll('.reqbox[data-req]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); reqEditor(b.dataset.req,()=>App.render()); }); root.querySelectorAll('.agcard[data-k]').forEach(c=>c.onclick=()=>{ const k=Store.get('contracts',c.dataset.k); const a=Store.get('assets',k?.assetId); if(a) assetDetail(a); }); }
 
 /* صفحة إسناد التشغيل لمستثمر */
 M.investor={key:'investor',label:'إسناد التشغيل لمستثمر',icon:'🤝',group:'نماذج التشغيل',render(v){
   const K=opAgreements().filter(k=>k.type==='مستثمر'), L=K.map(k=>({k,...agreementPL(k),...agreementOps(k)}));
   const due=sum(L,'due'), got=sum(L,'rev'), pay=sum(L,'pay'), prof=sum(L,'profit'), ending=L.filter(x=>x.daysLeft!=null&&x.daysLeft<=90);
   const F=Store.coll('finance'); const months=[...new Set(F.map(f=>f.date.slice(0,7)))].sort().slice(-12); const kIdOf=f=>f.contractId||agreementFor(f.assetId)?.id;
-  v.innerHTML=`<div class="pagehead inv"><div><h3>🤝 إسناد التشغيل لمستثمر <span class="en">Investor-Operated</span></h3><p class="small muted">ندفع للهيئة الملكية، والمستثمر يدفع لنا ويتحمل التشغيل كاملاً حسب نطاق عمله. ربحنا هو الفرق.</p></div><span class="pill info">${K.length} اتفاقية</span></div>
+  v.innerHTML=`<div class="pagehead inv"><div><h3>🤝 إسناد التشغيل لمستثمر <span class="en">Investor-Operated</span></h3><p class="small muted">ندفع للهيئة الملكية، والمستثمر يدفع لنا ويتحمل التشغيل كاملاً حسب نطاق عمله. ربحنا هو الفرق.</p></div><div class="phx"><span class="pill info">${K.length} اتفاقية</span>${can('edit')?'<button class="btn p sm" data-np="inv">＋ إضافة مشروع</button>':''}</div></div>
   <div class="grid g4 mb">
     <div class="card kpi" style="--kc:var(--green)"><div class="l">يدفع لنا المستثمرون</div><div class="v">${short(due)}</div><div class="s">سنوي حسب العقود</div></div>
     <div class="card kpi" style="--kc:var(--gold)"><div class="l">المحصّل فعلياً</div><div class="v">${short(got)}</div><div class="s">نسبة التحصيل ${pct(got,due)}%</div><div class="bar gold" style="margin-top:6px"><i style="width:${Math.min(100,pct(got,due))}%"></i></div></div>
@@ -915,7 +915,7 @@ M.operations={key:'operations',label:'التشغيل الذاتي',icon:'🏠',g
   const units=Store.coll('assets').filter(a=>a.level==='unit'); const occ=units.filter(u=>u.occupancy==='مشغول');
   const allF=finOf(Store.coll('payments')); const due=allF.overdue; const rentTotal=sum(occ,'rent');
   const bld=Store.coll('assets').filter(a=>a.level==='building');
-  v.innerHTML=`<div class="pagehead self"><div><h3>🏠 التشغيل الذاتي <span class="en">Self-Operation</span></h3><p class="small muted">ندفع للهيئة الملكية ونتولى التأجير والتحصيل والتشغيل بأنفسنا.</p></div><span class="pill gold">${SK.length} اتفاقية</span></div><div class="grid g4 mb">
+  v.innerHTML=`<div class="pagehead self"><div><h3>🏠 التشغيل الذاتي <span class="en">Self-Operation</span></h3><p class="small muted">ندفع للهيئة الملكية ونتولى التأجير والتحصيل والتشغيل بأنفسنا.</p></div><div class="phx"><span class="pill gold">${SK.length} اتفاقية</span>${can('edit')?'<button class="btn p sm" data-np="self">＋ إضافة مشروع</button>':''}</div></div><div class="grid g4 mb">
     <div class="card kpi"><div class="l">الإشغال</div><div class="v">${pct(occ.length,units.length)}%</div><div class="s">${occ.length}/${units.length} وحدة</div></div>
     <div class="card kpi" style="--kc:var(--gold)"><div class="l">المحصّل من جداول الدفعات</div><div class="v">${short(allF.paid)}</div><div class="s">من ${short(allF.total)} · متبقي ${short(allF.remaining)}</div><div class="bar gold" style="margin-top:6px"><i style="width:${allF.pct}%"></i></div></div>
     <div class="card kpi" style="--kc:var(--red)"><div class="l">مستحقات متأخرة (تحصيل)</div><div class="v">${short(due)}</div><div class="s">${Store.coll('clients').filter(c=>clientFin(c).overdue>0).length} عميل</div></div>
@@ -1292,7 +1292,7 @@ function wiAdvice(D,S){ const {v,R,best,closePick}=D, b=R[best], sb='team', s=R.
   else { plan.push(`جهّز فريق التأجير والتحصيل ${v.setupM?`خلال فترة التجهيز (${v.setupM} شهر)`:'قبل بدء التشغيل'}.`); plan.push(`اطرح عقد صيانة بسقف ${SAR(v.qUnits*v.maint)} سنوياً (${SAR(v.maint)} للوحدة)، وقارن 3 عروض على الأقل.`); plan.push(`احجز سيولة تشغيلية ${short(-b.peak)} على الأقل لتغطية الفجوة حتى يستقر التحصيل.`); plan.push(`راقب الإشغال شهرياً: نزوله تحت ${Math.round(Math.min(100,occB))}% يعني مراجعة القرار.`); }
   const title=D.seek?'التوصية: لا تشغّله ذاتياً، واطلب عروض مستثمرين':`التوصية: ${WI_OPTS[best].l}`, action=D.seek?'التشغيل الذاتي خاسر بهذه الأرقام، فالأفضل البحث عن مستثمر.':best==='inv'?'اطرح المشروع لمستثمر بالشروط أدناه.':'شغّله تشغيلاً ذاتياً.';
   return {title,action,why,plan,tone:(best!=='inv'&&v.qCash>0&&need>v.qCash)||occB>100||allNeg?'warn':'ok',minOffer,occB,sb}; }
-M.whatif={key:'whatif',label:'دراسة الفرص',icon:'🔍',group:'الرئيسية',render(v){
+M.whatif={key:'whatif',label:'دراسة وتحليل الفرصة',icon:'🔍',group:'الرئيسية',render(v){
   const st=WIView, {S,v:val,sv}=wiVals(), D=wiDecide(val), A=wiAdvice(D,S), R=D.R;
   const Q=WI_FD.filter(f=>f.g==='q'); if(st.step===undefined) st.step=sv.done?null:0;
   const toolbar=`<div class="toolbar"><span class="muted">حلّل أي مشروع جديد: أجب عن الأسئلة، ويقترح لك طريقة التشغيل الأنسب وأرقامها.</span><span class="sp"></span><button class="btn sm" id="wiReset">↺ دراسة مشروع جديد</button></div>`;
@@ -1390,7 +1390,7 @@ const NP_STEPS=[
   {id:'start',t:'date',s:'بداية الاتفاقية',l:'متى تبدأ الاتفاقية؟',w:['لحساب مدة الاتفاقية ومواعيد الاستحقاق والتنبيهات.','تُحسب منها نهاية الاتفاقية حسب المدة في السؤال التالي.','إن لم يُحدد بعد، ضع التاريخ المتوقع.']},
   {id:'years',t:'num',s:'مدة الاتفاقية',l:'كم سنة مدة الاتفاقية؟',u:'سنة',min:1,max:50,def:10,w:['المدة تحدد الأفق الذي يُسترد فيه الاستثمار.','تاريخ النهاية = البداية + المدة، ويُنبهك النظام قبل الانتهاء.','اكتب المدة المتبقية فعلاً إن كانت الاتفاقية قائمة.']},
   {id:'inv',t:'num',s:'التكلفة الاستثمارية',l:'كم التكلفة الاستثمارية الأولية للمشروع؟',u:'ر.س',min:0,def:0,hint:'تجهيز وتشطيب وأثاث، صفر إن لم توجد',w:['لحساب فترة استرداد ما صرفته.','تُسجَّل في الاتفاقية «التكلفة الاستثمارية»، وتظهر في صفحة التدفقات والاسترداد.','ضع ما صُرف أو سيُصرف قبل التشغيل.']},
-  {id:'model',t:'opts',s:'نموذج التشغيل',l:'كيف ستشغّل المشروع؟',opts:NP_MODEL,def:'help',w:['النموذج يحدد من يؤجر ويحصّل ويصون: أنت أو المستثمر.','يحدد نوع الاتفاقية التي تُنشأ، وأين يظهر المشروع: صفحة التشغيل الذاتي أو صفحة الإسناد لمستثمر.','إن لم تكن متأكداً اختر «ساعدني»، ونحسب لك التوصية بنفس أرقامك قبل الإنشاء.']},
+  {id:'model',t:'opts',s:'نموذج التشغيل',l:'كيف ستشغّل المشروع؟',opts:NP_MODEL,when:a=>!a.fixed,def:'help',w:['النموذج يحدد من يؤجر ويحصّل ويصون: أنت أو المستثمر.','يحدد نوع الاتفاقية التي تُنشأ، وأين يظهر المشروع: صفحة التشغيل الذاتي أو صفحة الإسناد لمستثمر.','إن لم تكن متأكداً اختر «ساعدني»، ونحسب لك التوصية بنفس أرقامك قبل الإنشاء.']},
   {id:'investor',t:'text',s:'المستثمر',l:'ما اسم المستثمر؟',when:a=>a.model==='inv',req:1,w:['يُسجَّل طرفاً في عقد الإسناد.','يظهر في صفحة الإسناد لمستثمر ومتابعة الدفعات.','اكتب الاسم التجاري كما في العقد.']},
   {id:'offer',t:'num',s:'دفعة المستثمر السنوية',l:'كم يدفع المستثمر سنوياً؟',u:'ر.س',min:0,when:a=>a.model!=='self',hintF:a=>a.model==='help'?'إن وصلك عرض؛ صفر إن لم يصل':'',w:['هذا دخلك المضمون في الإسناد.','يُسجَّل «ما يدفعه المستثمر لنا»، والفرق بينه وبين مبلغ الهيئة ربحك.','قارن العروض على نفس الشروط: الزيادة الدورية وفترة السماح.']},
   {id:'review',t:'review',l:'راجع وأنشئ المشروع'}
@@ -1439,7 +1439,8 @@ M.newproject={key:'newproject',label:'إضافة مشروع',icon:'➕',group:'�
     st.pickNow=pick;
   } else body=`<div class="wzn"><input id="wzI" type="${s.t==='num'?'number':s.t==='date'?'date':'text'}" ${s.t==='num'?'inputmode="decimal"':''} ${s.min!=null?`min="${s.min}"`:''} ${s.max!=null?`max="${s.max}"`:''} value="${esc(String(cur))}">${s.u?`<span>${s.u}</span>`:''}</div>`;
   const hint=s.hintF?s.hintF(a):s.hint;
-  v.innerHTML=`<div class="toolbar"><span class="muted">أضف مشروعاً جديداً بخطوات بسيطة، ويُنشأ المشروع ووحداته واتفاقيته تلقائياً.</span><span class="sp"></span><button class="btn sm" id="npClear">↺ ابدأ من جديد</button></div>
+  const back=a.model==='inv'&&a.fixed?'#investor':'#operations';
+  v.innerHTML=`<div class="toolbar"><a class="btn sm" href="${back}">→ رجوع إلى ${back==='#investor'?'الإسناد لمستثمر':'التشغيل الذاتي'}</a><span class="muted">${a.fixed?(a.model==='inv'?'مشروع جديد بإسناد لمستثمر':'مشروع جديد بتشغيل ذاتي'):'مشروع جديد'}: يُنشأ المشروع ووحداته واتفاقيته تلقائياً.</span><span class="sp"></span><button class="btn sm" id="npClear">↺ ابدأ من جديد</button></div>
   <div class="wizw"><div class="card wiz">${prog}<h2 class="wzq">${esc(s.l)}</h2>${hint?`<p class="muted wzh">${esc(hint)}</p>`:''}${body}
     <div class="wzf"><button class="btn" id="wzBack" ${i?'':'disabled'}>السابق</button><span class="sp"></span><button class="btn p" id="wzNext">${s.t==='review'?'إنشاء المشروع':i===steps.length-2?'المراجعة':'التالي'}</button></div></div>${side}</div>`;
   const go=j=>{ st.step=Math.max(0,j); M.newproject.render(v); window.scrollTo({top:0,behavior:'smooth'}); };
@@ -1451,13 +1452,13 @@ M.newproject={key:'newproject',label:'إضافة مشروع',icon:'➕',group:'�
   v.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{ const n=$('#npInvName',v); if(n) a.investor=n.value.trim(); a.pick=b.dataset.pick; M.newproject.render(v); });
   v.querySelectorAll('[data-j]').forEach(b=>b.onclick=()=>{ if(read()) go(Number(b.dataset.j)); });
   $('#wzBack',v).onclick=()=>{ read(); go(i-1); };
-  $('#npClear',v).onclick=()=>{ st.a={}; st.step=0; M.newproject.render(v); };
+  $('#npClear',v).onclick=()=>{ st.a=a.fixed?{model:a.model,fixed:1}:{}; st.step=0; M.newproject.render(v); };
   const sl=$('#npStudy',v); if(sl) sl.onclick=()=>{ const all=Store.data.wiStudies||(Store.data.wiStudies={}); const vals={qUnits:a.units,qRent:a.rent,auth:a.auth,qH:Math.min(30,a.years||10),qOffer:a.offer||0}; all[WI_KEY]={v:vals,t:Object.fromEntries(Object.keys(vals).map(k=>[k,1])),done:1}; Store.save(); WIView.step=null; };
   $('#wzNext',v).onclick=()=>{
     if(s.t!=='review'){ if(s.t!=='opts'&&!read()) return; if(s.t==='opts'&&a[s.id]==null) a[s.id]=cur; go(i+1); return; }
     const n=$('#npInvName',v); if(n) a.investor=n.value.trim();
     const model=st.pickNow; if(!a.name||!(a.units>0)) return toast('أكمل اسم المشروع وعدد الوحدات');
-    const r=npCreate(a,model); st.a={}; st.step=0; App.refreshBadges();
+    const r=npCreate(a,model); st.a=a.fixed?{model:a.model,fixed:1}:{}; st.step=0; App.refreshBadges();
     toast(`تم إنشاء ${r.P.name}: ${r.U.length} وحدة واتفاقية ${r.K.number}`); location.hash=model==='self'?'#operations':'#investor'; };
 }};
 
@@ -1515,7 +1516,7 @@ M.system={key:'system',label:'الإعدادات والنسخ',icon:'⚙️',gro
 }};
 
 /* ───────────────────────── App / Router ───────────────────────── */
-const NAV_ORDER=['dashboard','newproject','cashflow','whatif','agreements','alerts','operations','investor','assets','documents','contracts','finance','users','reports','gis','system'];
+const NAV_ORDER=['dashboard','whatif','cashflow','agreements','alerts','operations','investor','assets','documents','contracts','finance','users','reports','gis','system'];
 const App={
   user:null,
   init(){
