@@ -267,3 +267,24 @@ details.card summary{cursor:pointer;list-style:none} details.card summary::-webk
 details.card summary::before{content:"▸ ";color:var(--gold)} details.card[open] summary::before{content:"▾ "}
 :root[data-theme="dark"] .btn.p{background:var(--gold);border-color:var(--gold);color:#16242f}
 :root[data-theme="dark"] .toast{background:var(--gold);color:#16242f}
+
+/* دراسة الفرص: النمذجة */
+.srcTag.ok{background:var(--ok-bg);color:var(--ok)}
+.wqs .wq label{font-weight:700}
+.wrec{gap:18px} .wrec ol.why{padding-inline-start:22px}
+.wopts{align-items:stretch}
+.wopt{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:6px;background:var(--card);border:1px solid var(--line);border-top:5px solid var(--oc);border-radius:14px;padding:16px 18px;transition:box-shadow .15s,transform .15s}
+.wopt:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.08)}
+.wopt:focus-visible{outline:3px solid var(--oc);outline-offset:2px}
+.wopt.best{box-shadow:0 0 0 2px var(--ok) inset}
+.wopt.sel{background:var(--sand-2)}
+.wopt .wh{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-weight:800;font-size:15px}
+.wopt .wh span:first-child{flex:1}
+.wbig{font-size:26px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums}
+.wopt dl{display:grid;grid-template-columns:1fr auto;gap:6px 10px;margin:8px 0 0;font-size:13px}
+.wopt dt{color:var(--muted)} .wopt dd{margin:0;font-weight:700;text-align:end;font-variant-numeric:tabular-nums}
+.wit td.neg{color:var(--red)} .wit td.flip{color:var(--amber);font-weight:700}
+.wchk{display:flex;flex-wrap:wrap;gap:8px}
+.wchk span{font-size:13px;padding:5px 10px;border-radius:999px;background:var(--sand-2);color:var(--muted)}
+.wchk span.ok{background:var(--ok-bg);color:var(--ok)} .wchk span.part{background:var(--amber-bg);color:var(--amber)}
+h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
