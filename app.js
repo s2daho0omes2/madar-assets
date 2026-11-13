@@ -289,6 +289,12 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
     return `<div class="de ${cls||''}"><span>${dot?`<i class="${dot}"></i>`:''}${l}</span><b>${val}</b>
       ${pos?`<div class="dsp" role="img" aria-label="تشغيل ذاتي ${pa}%، إسناد لمستثمر ${100-pa}%"><i class="s" style="width:${pa}%"></i><i class="n" style="width:${100-pa}%"></i></div>`:''}
       <div class="dsl"><div><u class="s"></u>تشغيل ذاتي <b>${short(a)}</b>${pos?` <small>${pa}%</small>`:''}</div><div><u class="n"></u>إسناد لمستثمر <b>${short(b)}</b>${pos?` <small>${100-pa}%</small>`:''}</div></div></div>`; };
+  /* المستهدف السنوي (يُحدده المستخدم) والتغيّر بين آخر 3 أشهر والثلاثة قبلها من القيود المالية */
+  const T=Store.data.settings.targets||{}, hasT=T.profit>0||T.income>0;
+  const tgt=(l,act,t)=>{ if(!(t>0)) return ''; const p=Math.round(act/t*100), d=act-t; return `<div class="dtg"><div class="dtl"><span>${l}</span><b>${p}%</b></div><div class="dmeter"><i class="${p>=100?'ok':p>=85?'warn':'bad'}" style="width:${Math.max(2,Math.min(100,p))}%"></i></div><div class="dts">${short(act)} من مستهدف ${short(t)} · <b class="${d>=0?'tup':'tdn'}">${d>=0?'أعلى من الخطة بـ':'أقل من الخطة بـ'}${short(Math.abs(d))}</b></div></div>`; };
+  const cm=curMo(), rng=(a,b)=>{ const x=new Set(); for(let i=a;i<=b;i++) x.add(addMo(cm,i)); return x; }, sumK=(set,kind)=>sum(F.filter(f=>f.kind===kind&&set.has(f.date.slice(0,7))),'amount');
+  const L3=rng(-2,0), P3=rng(-5,-3), lr=sumK(L3,'إيراد'), le=sumK(L3,'مصروف'), pr=sumK(P3,'إيراد'), pe=sumK(P3,'مصروف');
+  const ch=(l,now,was,goodUp)=>{ const d=was?Math.round((now-was)/Math.abs(was)*100):null, up=now>=was; return `<div class="dch"><span>${l}</span><b>${short(now)}</b><em class="${d==null||d===0?'':up===goodUp?'tup':'tdn'}">${d==null?'لا توجد فترة سابقة':d===0?'بدون تغيّر':`${up?'▲':'▼'} ${Math.abs(d)}%`}</em><small>كان ${short(was)}</small></div>`; };
   v.innerHTML=`
   <div class="dtier">الأساسي</div>
   <section class="dhero mb">
@@ -298,6 +304,12 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
       ${eq('الدخل السنوي',short(gross),'','',S('rev'),I('due'))}<em>−</em>${eq('تكاليف التشغيل',short(S('exp')),'c','',S('exp'),0)}<em>−</em>${eq('ندفع للهيئة الملكية',short(PM.pay),'a','',S('pay'),I('pay'))}<em>=</em>${eq('صافي الربح',short(PM.profit),'p','res'+(PM.profit<0?' neg':''),S('profit'),I('profit'))}
     </div>
     ${gross?flow(gross,S('exp'),PM.pay,PM.profit)+`<div class="dh-eye">من كل 100 ريال دخل: ${per(S('exp'))} تكاليف تشغيل، ${per(PM.pay)} للهيئة الملكية، و${PM.profit<0?'لا يبقى ربح':per(PM.profit)+' تبقى ربحاً'}.</div>`:''}
+    <div class="dh2">
+      <div class="dbox"><div class="dbh"><span>مقابل المستهدف السنوي</span>${can('edit')?`<button type="button" class="dlnk" id="dTgt">${hasT?'تعديل المستهدف':'تحديد المستهدف'}</button>`:''}</div>
+        ${hasT?tgt('صافي الربح',PM.profit,T.profit)+tgt('الدخل',gross,T.income):'<div class="dh-eye">لم يُحدد مستهدف بعد. حدّد مستهدف الربح والدخل السنوي لتعرف هل أنت أعلى من الخطة أم أقل.</div>'}</div>
+      <div class="dbox"><div class="dbh"><span>التغيّر: آخر 3 أشهر مقابل الثلاثة قبلها</span></div>
+        <div class="dchs">${ch('الدخل المحصّل',lr,pr,true)}${ch('التكاليف',le,pe,false)}${ch('الصافي',lr-le,pr-pe,true)}</div><div class="dh-eye" style="font-size:12px">محسوب من القيود المالية المسجلة في كل فترة.</div></div>
+    </div>
   </section>
 
   <div class="dtier">المهم</div>
@@ -333,6 +345,8 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
     ${D.length>3?`<a class="small" href="#alerts" style="display:inline-block;margin-top:10px">عرض ${D.length-3} بنود أخرى</a>`:''}
   </div>`;
   v.querySelectorAll('tr[data-go]').forEach(r=>r.onclick=()=>{ location.hash=r.dataset.go; });
+  if($('#dTgt',v)) $('#dTgt',v).onclick=()=>{ Modal.open({title:'المستهدف السنوي',body:`<div class="form"><div class="f"><label>مستهدف صافي الربح السنوي (ر.س)</label><input id="tgP" type="number" min="0" value="${T.profit||''}"></div><div class="f"><label>مستهدف الدخل السنوي (ر.س)</label><input id="tgI" type="number" min="0" value="${T.income||''}"></div></div><p class="small muted" style="margin-top:8px">من الخطة أو الموازنة المعتمدة. اترك الخانة فارغة إن لم يكن لها مستهدف. الفعلي الآن: ربح ${short(PM.profit)} ودخل ${short(gross)}.</p>`,footer:`<button class="btn" onclick="Modal.close()">إلغاء</button><button class="btn p" id="tgS">حفظ</button>`});
+    $('#tgS').onclick=()=>{ Store.data.settings.targets={profit:Math.max(0,Number($('#tgP').value)||0),income:Math.max(0,Number($('#tgI').value)||0)}; Store.log('تعديل','settings','targets','تحديث المستهدف السنوي'); Store.save(); Modal.close(); M.dashboard.render(v); toast('تم حفظ المستهدف'); }; };
   const net=months.map((_,i)=>mSelfRev[i]+mInvRev[i]-mSelfExp[i]), st={scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,ticks:{callback:x=>short(x)}}}};
   let drawn=false; $('#dMore',v).addEventListener('toggle',e=>{ if(!e.target.open||drawn) return; drawn=true;
     Charts.make('c1','bar',months,[{label:'دخل التشغيل الذاتي',data:mSelfRev,color:COLORS[2],stack:'r'},{label:'دفعات المستثمرين',data:mInvRev,color:COLORS[3],stack:'r'},{label:'تكاليف التشغيل الذاتي',data:mSelfExp,color:COLORS[5],stack:'e'},{label:'الصافي',data:net,type:'line',stack:'n',color:'#b9925a',backgroundColor:'transparent',pointRadius:2,borderWidth:2.5}],st);

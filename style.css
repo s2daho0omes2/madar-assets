@@ -429,3 +429,18 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .dsl>div{display:flex;align-items:center;gap:6px;flex-wrap:wrap} .dsl u{width:9px;height:9px;border-radius:50%;flex:none;text-decoration:none}
 .dsl b{font-size:13.5px!important;font-weight:700;color:#fff;font-variant-numeric:tabular-nums} .dsl small{font-size:13px;font-weight:700;color:rgba(241,237,228,.6)}
 .de.res .dsl{color:#4a5a66} .de.res .dsl b{color:#16242f!important} .de.res .dsl small{color:#6b7682}
+
+/* المستهدف والتغيّر داخل الشريط الأساسي */
+.dh2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;border-top:1px solid rgba(255,255,255,.12);padding-top:16px}
+@media(max-width:860px){.dh2{grid-template-columns:1fr}}
+.dbox{background:rgba(255,255,255,.07);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.dbh{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:14px;font-weight:700}
+.dlnk{all:unset;cursor:pointer;font-size:13px;font-weight:700;color:#d4ad74;text-decoration:underline} .dlnk:focus-visible{outline:2px solid #d4ad74;outline-offset:2px}
+.dtg{display:flex;flex-direction:column;gap:6px}
+.dtl{display:flex;justify-content:space-between;font-size:13.5px;color:rgba(241,237,228,.8)} .dtl b{font-size:18px;color:#fff;font-variant-numeric:tabular-nums}
+.dhero .dmeter{background:rgba(255,255,255,.14)} .dhero .dmeter i.ok{background:#4fae82} .dhero .dmeter i.warn{background:#e6c067} .dhero .dmeter i.bad{background:#f08a7c}
+.dts{font-size:13px;color:rgba(241,237,228,.75)} .dhero .tup{color:#7fd1a8} .dhero .tdn{color:#f08a7c}
+.dchs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.dch{display:flex;flex-direction:column;gap:2px;min-width:0}
+.dch span{font-size:13px;color:rgba(241,237,228,.75)} .dch b{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+.dch em{font-style:normal;font-size:14px;font-weight:800;color:rgba(241,237,228,.7);font-variant-numeric:tabular-nums} .dch small{font-size:12px;color:rgba(241,237,228,.55)}
