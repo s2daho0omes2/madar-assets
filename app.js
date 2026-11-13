@@ -6,8 +6,13 @@
 const DB_KEY='am_db_v1';
 const Store={
   data:null,
+  /* نسخة تلقائية يومية من بياناتك قبل أي تحديث للنظام: تُحفظ آخر 5 أيام في المتصفح */
+  snapshot(raw){ try{ const day=new Date().toISOString().slice(0,10), pre=DB_KEY+'_bak_'; if(localStorage.getItem(pre+day)) return; localStorage.setItem(pre+day,raw);
+      Object.keys(localStorage).filter(k=>k.startsWith(pre)).sort().slice(0,-5).forEach(k=>localStorage.removeItem(k)); }catch(e){} },
+  snapshots(){ try{ const pre=DB_KEY+'_bak_'; return Object.keys(localStorage).filter(k=>k.startsWith(pre)).sort().reverse().map(k=>({day:k.slice(pre.length),kb:Math.round(localStorage.getItem(k).length/1024)})); }catch(e){ return []; } },
+  restore(day){ try{ const raw=localStorage.getItem(DB_KEY+'_bak_'+day); if(!raw) return false; JSON.parse(raw); const cur=localStorage.getItem(DB_KEY); if(cur) localStorage.setItem(DB_KEY+'_before_restore',cur); localStorage.setItem(DB_KEY,raw); return true; }catch(e){ return false; } },
   load(){
-    try{ const raw=ls.get(DB_KEY); if(raw){ this.data=JSON.parse(raw); return; } }catch(e){}
+    try{ const raw=ls.get(DB_KEY); if(raw){ this.data=JSON.parse(raw); this.snapshot(raw); return; } }catch(e){}
     this.data=JSON.parse(JSON.stringify(window.SEED));
     this.save();
   },
@@ -1497,9 +1502,12 @@ M.alerts={key:'alerts',label:'التنبيهات',icon:'🔔',group:'الرئي�
 M.system={key:'system',label:'الإعدادات والنسخ',icon:'⚙️',group:'متقدم',render(v){
   v.innerHTML=`<div class="grid g2"><div class="card"><h3>بيانات النظام</h3><div class="form"><div class="f"><label>اسم المشروع</label><input id="pn" value="${esc(Store.data.settings.projectName)}"></div><div class="f"><label>العملة</label><input id="cur" value="${esc(Store.data.settings.currency)}"></div></div><button class="btn p" id="sv" style="margin-top:12px">حفظ</button></div>
   <div class="card"><h3>النسخ الاحتياطي والبيانات</h3><p class="small muted">البيانات محفوظة محلياً في هذا المتصفح. صدّر نسخة احتياطية بانتظام، وعند الرفع للإنتاج ننقلها إلى قاعدة بيانات سحابية.</p><div class="toolbar" style="margin-top:12px"><button class="btn ${IN_FRAME?'hidden':''}" id="ex">⬇ تصدير JSON</button><label class="btn">⬆ استيراد JSON<input type="file" id="im" accept=".json" class="hidden"></label><button class="btn d" id="rs">↺ إعادة البيانات التجريبية</button></div>
-  <div class="small muted" style="margin-top:10px">السجلات: ${['assets','contracts','documents','finance','clients','payments','audit'].map(c=>`${c} ${Store.coll(c).length}`).join(' · ')}</div></div></div>`;
+  <div class="small muted" style="margin-top:10px">السجلات: ${['assets','contracts','documents','finance','clients','payments','audit'].map(c=>`${c} ${Store.coll(c).length}`).join(' · ')}</div>
+  <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px"><b>النسخ التلقائية اليومية</b><div class="small muted">تؤخذ نسخة من بياناتك أول مرة تفتح النظام كل يوم، ويُحتفظ بآخر 5 أيام. تحديثات النظام لا تمس بياناتك.</div>
+    ${Store.snapshots().map(x=>`<div class="nprow" style="padding:8px 0"><span class="num">${x.day} · ${x.kb} ك.ب</span><button class="btn sm" data-rs="${x.day}">استرجاع</button></div>`).join('')||'<div class="small muted" style="margin-top:6px">لا توجد نسخ بعد.</div>'}</div></div></div>`;
   $('#sv',v).onclick=()=>{ Store.data.settings.projectName=$('#pn',v).value; Store.data.settings.currency=$('#cur',v).value; Store.save(); toast('تم الحفظ'); };
   $('#ex',v).onclick=()=>Store.export(); $('#im',v).onchange=e=>e.target.files[0]&&Store.import(e.target.files[0]);
+  v.querySelectorAll('[data-rs]').forEach(b=>b.onclick=()=>ask(`سترجع البيانات إلى نسخة ${b.dataset.rs}، وتُحفظ الحالة الحالية احتياطاً.`,()=>{ if(Store.restore(b.dataset.rs)) location.reload(); else toast('تعذر الاسترجاع'); },'استرجاع'));
   $('#rs',v).onclick=()=>ask('سيتم حذف كل البيانات المحلية وإعادة البيانات التجريبية.',()=>{ Store.reset(); location.reload(); },'إعادة البيانات');
 }};
 
