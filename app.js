@@ -283,6 +283,7 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
   const ending=inv.filter(x=>x.daysLeft!=null&&x.daysLeft<=90), R=Store.coll('requirements').filter(r=>inv.some(x=>x.k.id===r.contractId)), rq=reqStats(R);
   const obs=obsStats(Store.coll('observations').filter(o=>omContracts().some(k=>k.id===o.contractId)));
   const share=x=>PM.profit>0?`يساهم بـ${per(x,PM.profit)}% من ربح المحفظة`:'';
+  const gpins=Store.coll('assets').filter(a=>a.x!=null&&a.y!=null&&a.mapId===GIS_BASE.id);
   const occP=pct(PM.occ,PM.units), big=(l,val,cls,word,note)=>`<div class="dk"><div class="l">${l}</div><div class="v">${val}</div><span class="pill ${cls}">${word}</span><div class="s">${note}</div></div>`;
   /* كل خانة تُقسم حسب مصدرها: التشغيل الذاتي والإسناد لمستثمر */
   const seg=(l,p)=>p>=38?`${l} ${p}%`:p>=14?`${p}%`:'';
@@ -313,6 +314,9 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
     ${big('التحصيل من المستأجرين',`${col}%`,lC,lC==='ok'?'ممتاز':lC==='warn'?'مقبول':'ضعيف',PM.arrears?`متأخرات ${short(PM.arrears)}`:'لا توجد متأخرات')}
     ${big('عقود تنتهي خلال 90 يوماً',ending.length,ending.length?'bad':'ok',ending.length?'تحتاج قراراً':'لا يوجد',ending.length?ending.map(x=>esc(nm(x))).join('، '):'كل العقود سارية لأكثر من 90 يوماً')}
   </div>
+  <div class="card mb" style="padding:8px"><div class="dmaph"><h3>مواقع المشاريع</h3><span class="small muted">${gpins.length?'اضغط أي موقع لعرض ملخصه':'لم تُربط مواقع بعد'}</span><span class="sp"></span><a class="btn sm" href="#gis">${gpins.length?'تعديل المواقع':'حدّد مواقع المشاريع'}</a></div>
+    <div class="gmap" id="dMap"><img src="${GIS_BASE.src}" alt="خريطة ${GIS_BASE.name}" draggable="false">${gpins.map(a=>`<button type="button" class="gpin ${gisTone(a)}" style="left:${a.x}%;top:${a.y}%" data-id="${a.id}" aria-label="${esc(a.name)}"><i></i><span>${esc(a.name)}</span></button>`).join('')}</div>
+    <div class="gleg"><span><i class="self"></i>تشغيل ذاتي</span><span><i class="inv"></i>إسناد لمستثمر</span><span><i class="none"></i>بلا اتفاقية</span></div></div>
 
   <div class="dtier">تفاصيل أخرى</div>
   <details class="card mb" id="dTbl"><summary><b>كل الاتفاقيات</b> <span class="small muted">الربح والصحة وموعد الانتهاء لكل اتفاقية</span></summary>
@@ -334,6 +338,7 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
     ${D.length>3?`<a class="small" href="#alerts" style="display:inline-block;margin-top:10px">عرض ${D.length-3} بنود أخرى</a>`:''}
   </div>`;
   v.querySelectorAll('tr[data-go]').forEach(r=>r.onclick=()=>{ location.hash=r.dataset.go; });
+  v.querySelectorAll('#dMap .gpin').forEach(b=>b.onclick=()=>{ const a=Store.get('assets',b.dataset.id); Modal.open({title:esc(a.name),body:gisInfo(a),footer:`<button class="btn" onclick="Modal.close();location.hash='#gis'">فتح الخريطة</button><button class="btn p" id="gOpen">فتح ملف الأصل</button>`}); $('#gOpen').onclick=()=>{ Modal.close(); assetDetail(a); }; });
   const net=months.map((_,i)=>mSelfRev[i]+mInvRev[i]-mSelfExp[i]), st={scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,ticks:{callback:x=>short(x)}}}};
   let drawn=false; $('#dMore',v).addEventListener('toggle',e=>{ if(!e.target.open||drawn) return; drawn=true;
     Charts.make('c1','bar',months,[{label:'دخل التشغيل الذاتي',data:mSelfRev,color:COLORS[2],stack:'r'},{label:'دفعات المستثمرين',data:mInvRev,color:COLORS[3],stack:'r'},{label:'تكاليف التشغيل الذاتي',data:mSelfExp,color:COLORS[5],stack:'e'},{label:'الصافي',data:net,type:'line',stack:'n',color:'#b9925a',backgroundColor:'transparent',pointRadius:2,borderWidth:2.5}],st);
@@ -1048,6 +1053,9 @@ M.reports={key:'reports',label:'التقارير والتحليلات',icon:'�
 /* الخريطة: خريطة ينبع الصناعية مدمجة. انقر أي نقطة لربطها بمشروع موجود، وانقر الدبوس لعرض المشروع أو نقله */
 const GIS_BASE={id:'MAP-YANBU',name:'ينبع الصناعية',src:'assets/yanbu-map.webp',builtin:true};
 const healthBadgeOf=a=>{ const k=agreementFor(a.id); return k&&k.assetId===a.id?healthBadge(k):''; };
+/* ملخص موقع على الخريطة: يُستخدم في صفحة الخريطة ولوحة التحكم */
+const gisTone=a=>{ const t=agreementFor(a.id)?.type; return t==='تشغيل ذاتي'?'self':t==='مستثمر'?'inv':'none'; };
+const gisInfo=a=>{ const k=agreementFor(a.id), p=k&&agreementPL(k); return `<div class="nplist"><div class="nprow"><span>المستوى</span><b>${LEVELS[a.level]}</b></div><div class="nprow"><span>الموقع</span><b>${esc(a.location||'—')}</b></div><div class="nprow"><span>نموذج التشغيل</span><b>${k?AG_LABEL[k.type]:'بلا اتفاقية'}</b></div>${k?`<div class="nprow"><span>الاتفاقية</span><b>${esc(k.type==='مستثمر'?k.party:k.title)}</b></div><div class="nprow"><span>الربح السنوي للاتفاقية</span><b>${num(p.profit)} ر.س</b></div><div class="nprow"><span>ندفع للهيئة الملكية</span><b>${num(p.pay)} ر.س</b></div>`:''}</div>`; };
 M.gis={key:'gis',label:'الخريطة',icon:'🗺️',group:'متقدم',render(v){
   let curMap=GIS_BASE.id, moving=null;
   const tone=a=>{ const t=agreementFor(a.id)?.type; return t==='تشغيل ذاتي'?'self':t==='مستثمر'?'inv':'none'; };
@@ -1160,7 +1168,7 @@ const MADAR_MARK=`<svg viewBox="0 0 152 140" width="36" height="33" aria-hidden=
    كل بديل يُحاكى شهرياً على مدة القرار، ثم يُقارن بالقيمة الحالية الصافية بعد إضافة علاوة مخاطر تشغيلية لكل بديل */
 const WIView={k:'',opt:''};
 const WI_OPTS={team:{l:'التشغيل الذاتي',ic:'🏠',c:'#a9713d',risk:'مرتفعة',rk:2},inv:{l:'إسناد التشغيل لمستثمر',ic:'🤝',c:'#5b8aa8',risk:'منخفضة',rk:1}};
-const WI_COND={new:{l:'جديد أو مجدَّد حديثاً',setup:5000,renew:3000,every:7,setupM:2,maint:1500},mid:{l:'متوسط',setup:15000,renew:6000,every:5,setupM:3,maint:2500},old:{l:'قديم ويحتاج تأهيلاً',setup:35000,renew:10000,every:3,setupM:6,maint:4000}};
+const WI_COND={new:{l:'جديد أو مجدَّد حديثاً',setup:5000,renew:3000,every:7,setupM:2,maint:1500},mid:{l:'متوسط',setup:15000,renew:6000,every:5,setupM:3,maint:2520},old:{l:'قديم ويحتاج تأهيلاً',setup:35000,renew:10000,every:3,setupM:6,maint:4020}};
 const WI_TEAM={yes:{l:'نعم، فريق جاهز',prem:1},part:{l:'جزئياً',prem:2.5},no:{l:'لا يوجد',prem:4}};
 const WI_RISK={low:{l:'متحفظ: أفضّل الدخل المضمون',close:20},mid:{l:'متوازن',close:10},high:{l:'مرن: أقبل المخاطرة لعائد أعلى',close:3}};
 const WI_YN={yes:{l:'نعم'},no:{l:'لا، يحتاج تجهيزاً'}};
@@ -1180,8 +1188,8 @@ const WI_FD=[
   {id:'qRamp',g:'q',s:'الوصول للإشغال',min:0,max:60,l:'كم شهراً يحتاج حتى يصل لهذا الإشغال؟',u:'شهر',def:v=>v.qReady==='yes'?6:12},
   {id:'qCond',g:'q',s:'حالة الأصل',l:'ما حالة الأصل؟',opts:WI_COND,def:()=>'mid'},
   {id:'qReady',g:'q',s:'جاهز للتأجير',l:'هل الأصل جاهز للتأجير الآن؟',opts:WI_YN,def:()=>'no'},
-  {id:'maint',g:'q',s:'صيانة الوحدة سنوياً',min:0,l:'كم تكلفة الصيانة السنوية للوحدة الواحدة؟',u:'ر.س',def:v=>WI_COND[v.qCond].maint,src:()=>'مرجع تقريبي حسب حالة الأصل',hint:'تشمل عقد الصيانة الوقائية والإصلاحات وقطع الغيار'},
-  {id:'util',g:'q',s:'عدادات الوحدة سنوياً',min:0,l:'كم تكلفة العدادات (كهرباء ومياه) السنوية للوحدة في التشغيل الذاتي؟',u:'ر.س',def:()=>1800,src:()=>'مرجع تقريبي',hint:'ما تدفعه أنت: المناطق المشتركة والإنارة والوحدات الشاغرة. صفر إن كان المستأجر يدفع كل شيء'},
+  {id:'maint',g:'q',per:12,s:'صيانة الوحدة شهرياً',min:0,l:'كم تكلفة الصيانة الشهرية للوحدة الواحدة؟',u:'ر.س شهرياً',def:v=>WI_COND[v.qCond].maint,src:()=>'مرجع تقريبي حسب حالة الأصل',hint:'تشمل عقد الصيانة الوقائية والإصلاحات وقطع الغيار'},
+  {id:'util',g:'q',per:12,s:'عدادات الوحدة شهرياً',min:0,l:'كم تكلفة العدادات (كهرباء ومياه) الشهرية للوحدة في التشغيل الذاتي؟',u:'ر.س شهرياً',def:()=>1800,src:()=>'مرجع تقريبي',hint:'ما تدفعه أنت: المناطق المشتركة والإنارة والوحدات الشاغرة. صفر إن كان المستأجر يدفع كل شيء'},
   {id:'opsU',g:'q',per:12,s:'تشغيل الوحدة شهرياً',min:0,l:'كم تكلفة عملية التشغيل الشهرية للوحدة؟',u:'ر.س شهرياً',def:v=>v.qUnits>=100?3000:v.qUnits>=40?4020:5520,src:()=>'مرجع تقريبي حسب حجم المشروع',hint:'رواتب فريق التأجير والتحصيل، الحراسة، النظافة، الإدارة والأنظمة والتأمين'},
   {id:'qTeam',g:'جاهزية التشغيل الذاتي',s:'فريق التشغيل',l:'جاهزية فريقك للتأجير والتشغيل والتحصيل',hint:'تؤثر على نسبة التحصيل وعلاوة مخاطر التشغيل الذاتي',opts:WI_TEAM,def:()=>'part'},
   {id:'qOffer',g:'q',s:'عرض المستثمر',min:0,l:'كم عرض المستثمر السنوي؟',u:'ر.س',def:(v,S)=>S.offer,src:S=>S.offer?'العقد الحالي':'',hint:'اتركه صفراً إن لم يصلك عرض، وتظهر لك أقل قيمة تقبلها'},
@@ -1230,8 +1238,8 @@ const WI_WHY={
   qRamp:['الأصل الجديد أو المعاد طرحه لا يمتلئ من أول يوم.','الإشغال يتصاعد تدريجياً خلال هذه الأشهر حتى يصل للنسبة المستهدفة، فيقل دخل السنة الأولى.','صفر إن كان مؤجراً حالياً، ومن 6 إلى 18 شهراً لأصل جديد حسب الطلب.'],
   qCond:['حالة الأصل تحدد كم ستصرف لتجهيزه وصيانته مستقبلاً.','تحدد التقدير الأولي لتكلفة التجهيز ومدته، وتكلفة التجديدات الرأسمالية وكل كم سنة تتكرر.','تقدر تعدّل هذه التقديرات بدقة من الافتراضات التفصيلية بعد ظهور النتيجة.'],
   qReady:['إن احتاج الأصل تجهيزاً، فهناك صرف وانتظار قبل أي دخل.','«نعم»: لا تكلفة تجهيز ويبدأ الدخل فوراً. «لا»: تكلفة تجهيز وأشهر بلا دخل في التشغيل الذاتي، ويطلب المستثمر عادة فترة سماح.','التجهيز يشمل التشطيب والأثاث والأنظمة وتسويق الإطلاق.'],
-  maint:['الصيانة من أكبر التكاليف المتكررة، وتزيد مع عمر الأصل.','تُحسب: عدد الوحدات × تكلفة الوحدة، كعقد صيانة سنوي يبدأ مع التشغيل وينمو كل سنة بنسبة نمو التكاليف. في التشغيل الذاتي تتحملها أنت، وعند الإسناد يتحملها المستثمر.','مرجع تقريبي للسكني: جديد 1,500، متوسط 2,500، قديم 4,000 ر.س للوحدة سنوياً. أكّد الرقم بعرض سعر من مقاول صيانة.'],
-  util:['في التشغيل الذاتي أنت صاحب العدادات، وأي استهلاك لا يدفعه مستأجر يقع عليك.','تُحسب: عدد الوحدات × تكلفة الوحدة، وتنمو سنوياً بنسبة نمو التكاليف. تُحمَّل على التشغيل الذاتي فقط، وعند الإسناد يتحملها المستثمر.','المرجع التقريبي 1,800 ر.س للوحدة سنوياً (مناطق مشتركة وإنارة وشواغر). ارفعه إن كانت الفواتير كلها باسمك، وراجعه من فواتير آخر سنة.'],
+  maint:['الصيانة من أكبر التكاليف المتكررة، وتزيد مع عمر الأصل.','تُحسب: عدد الوحدات × تكلفة الوحدة الشهرية × 12، كعقد صيانة يبدأ مع التشغيل وينمو كل سنة بنسبة نمو التكاليف. في التشغيل الذاتي تتحملها أنت، وعند الإسناد يتحملها المستثمر.','مرجع تقريبي للسكني شهرياً: جديد 125، متوسط 210، قديم 335 ر.س للوحدة. أكّد الرقم بعرض سعر من مقاول صيانة.'],
+  util:['في التشغيل الذاتي أنت صاحب العدادات، وأي استهلاك لا يدفعه مستأجر يقع عليك.','تُحسب: عدد الوحدات × تكلفة الوحدة الشهرية × 12، وتنمو سنوياً بنسبة نمو التكاليف. تُحمَّل على التشغيل الذاتي فقط، وعند الإسناد يتحملها المستثمر.','المرجع التقريبي 150 ر.س للوحدة شهرياً (مناطق مشتركة وإنارة وشواغر). ارفعه إن كانت الفواتير كلها باسمك، وراجعه من فواتير آخر سنة.'],
   opsU:['التشغيل الذاتي يعني فريقاً وإدارة تدفع أنت تكلفتها كل شهر.','تُحسب: عدد الوحدات × تكلفة الوحدة الشهرية × 12 = إجمالي تكاليف عملية التشغيل السنوية. تُحمَّل على التشغيل الذاتي فقط.','مرجع تقريبي للوحدة شهرياً: 250 ر.س للمشاريع الكبيرة (100 وحدة فأكثر)، 335 للمتوسطة، 460 للصغيرة، لأن التكاليف الثابتة تتوزع على وحدات أقل.'],
   qTeam:['التشغيل الذاتي يحتاج فريقاً يؤجر ويحصّل ويتابع الصيانة.','بدون فريق ترتفع علاوة مخاطر التشغيل الذاتي وتنخفض نسبة التحصيل المتوقعة، فيقترب خيار الإسناد لمستثمر.','«جزئياً» تعني أن لديك بعض الأدوار وتحتاج تعيين أو تعاقد للباقي.'],
   qOffer:['عرض المستثمر هو البديل المضمون للتشغيل الذاتي.','نحسب دفعاته مع الزيادة الدورية وفترة السماح ونقارنها بالتشغيل الذاتي. إن تركته صفراً نحسب لك أقل عرض يستحق القبول.','قارن العروض على نفس الشروط: الزيادة الدورية، فترة السماح، ومن يدفع للهيئة الملكية.'],
@@ -1310,7 +1318,7 @@ function wiAdvice(D,S){ const {v,R,best,closePick}=D, b=R[best], sb='team', s=R.
   if(minOffer!=null) why.push(minOffer<1000&&!v.qOffer?`أي عرض من مستثمر أفضل من التشغيل الذاتي هنا، بشرط ألا تتحمل التزامات إضافية.`:R.team.val<0&&!v.qOffer?`أي عرض يزيد على ${SAR(minOffer)} سنوياً أفضل من التشغيل الذاتي.`:v.qOffer?`أقل عرض يجعل الإسناد مساوياً للتشغيل الذاتي: ${SAR(minOffer)} سنوياً، والعرض الذي وصلك ${v.qOffer>=minOffer?'أعلى منه':'أقل منه'}.`:`لم يصلك عرض بعد: لا تقبل أقل من ${SAR(minOffer)} سنوياً بنفس الزيادات والسماح.`);
   const need=-s.peak; if(best!=='inv'&&v.qCash>0&&need>v.qCash) why.push(`السيولة غير كافية: يحتاج التشغيل الذاتي حتى ${short(need)} في أصعب نقطة والمتاح ${short(v.qCash)}. ارفع نسبة التمويل أو قلّل التجهيز.`);
   if(best==='inv'){ plan.push(`اطرح المشروع لمستثمرين ${floor!=null&&floor>=1000?`بحد أدنى ${SAR(floor)} سنوياً`:'بأعلى عرض يغطي التزام الهيئة'}، وزيادة ${v.esc}% كل ${wiYrs(v.escN)}.`); plan.push(`ألزم المستثمر بعقد صيانة معتمد ومستوى خدمة محدد؛ تكلفة الصيانة المتوقعة ${SAR(v.qUnits*v.maint)} سنوياً تقع عليه.`); plan.push('اشترط ضماناً بنكياً يعادل دفعات سنة، وسداداً مقدماً لكل فترة.'); plan.push(`نُص في العقد على من يتحمل التجديدات والتزام الهيئة (الافتراض الحالي: التجديدات ${v.renewInv==='us'?'علينا':'على المستثمر'}، والتزام الهيئة ${v.authInv==='us'?'علينا':'على المستثمر'}).`); }
-  else { plan.push(`جهّز فريق التأجير والتحصيل ${v.setupM?`خلال فترة التجهيز (${v.setupM} شهر)`:'قبل بدء التشغيل'}.`); plan.push(`اطرح عقد صيانة بسقف ${SAR(v.qUnits*v.maint)} سنوياً (${SAR(v.maint)} للوحدة)، وقارن 3 عروض على الأقل.`); plan.push(`احجز سيولة تشغيلية ${short(-b.peak)} على الأقل لتغطية الفجوة حتى يستقر التحصيل.`); plan.push(`راقب الإشغال شهرياً: نزوله تحت ${Math.round(Math.min(100,occB))}% يعني مراجعة القرار.`); }
+  else { plan.push(`جهّز فريق التأجير والتحصيل ${v.setupM?`خلال فترة التجهيز (${v.setupM} شهر)`:'قبل بدء التشغيل'}.`); plan.push(`اطرح عقد صيانة بسقف ${SAR(v.qUnits*v.maint)} سنوياً (${SAR(v.maint/12)} للوحدة شهرياً)، وقارن 3 عروض على الأقل.`); plan.push(`احجز سيولة تشغيلية ${short(-b.peak)} على الأقل لتغطية الفجوة حتى يستقر التحصيل.`); plan.push(`راقب الإشغال شهرياً: نزوله تحت ${Math.round(Math.min(100,occB))}% يعني مراجعة القرار.`); }
   const title=D.seek?'التوصية: لا تشغّله ذاتياً، واطلب عروض مستثمرين':`التوصية: ${WI_OPTS[best].l}`, action=D.seek?'التشغيل الذاتي خاسر بهذه الأرقام، فالأفضل البحث عن مستثمر.':best==='inv'?'اطرح المشروع لمستثمر بالشروط أدناه.':'شغّله تشغيلاً ذاتياً.';
   return {title,action,why,plan,tone:(best!=='inv'&&v.qCash>0&&need>v.qCash)||occB>100||allNeg?'warn':'ok',minOffer,occB,sb}; }
 M.whatif={key:'whatif',label:'دراسة وتحليل الفرصة',icon:'🔍',group:'الرئيسية',render(v){
@@ -1328,8 +1336,8 @@ M.whatif={key:'whatif',label:'دراسة وتحليل الفرصة',icon:'🔍',
         <div><span>الدخل بإشغال ${val.qOcc}%</span><b>${short(atOcc)}</b></div>
         <div><span>المسدد للهيئة الملكية</span><b class="neg">${val.auth?'-'+short(val.auth):'0'}</b></div>
         <div class="sub">تكاليف التشغيل الذاتي (لا تتحملها عند الإسناد):</div>
-        <div><span>الصيانة (${Number(val.maint).toLocaleString('en-US')} للوحدة)</span><b class="neg">${val.maint?'-'+short(val.qUnits*val.maint):'0'}</b></div>
-        <div><span>العدادات (${Number(val.util).toLocaleString('en-US')} للوحدة)</span><b class="neg">${val.util?'-'+short(val.qUnits*val.util):'0'}</b></div>
+        <div><span>الصيانة (${Math.round(val.maint/12).toLocaleString('en-US')} للوحدة شهرياً)</span><b class="neg">${val.maint?'-'+short(val.qUnits*val.maint):'0'}</b></div>
+        <div><span>العدادات (${Math.round(val.util/12).toLocaleString('en-US')} للوحدة شهرياً)</span><b class="neg">${val.util?'-'+short(val.qUnits*val.util):'0'}</b></div>
         <div><span>عملية التشغيل (${Math.round(val.opsU/12).toLocaleString('en-US')} للوحدة شهرياً)</span><b class="neg">${val.fixed?'-'+short(val.fixed):'0'}</b></div>
         <div class="tot"><span>المتبقي من التشغيل الذاتي</span><b class="${selfLeft<0?'neg':''}">${short(selfLeft)}</b></div></div></aside>`;
     v.innerHTML=`${toolbar}<div class="wizw"><div class="card wiz"><div class="wzp"><span>السؤال ${i+1} من ${Q.length}</span><div class="bar gold"><i style="width:${Math.round((i+1)/Q.length*100)}%"></i></div></div>

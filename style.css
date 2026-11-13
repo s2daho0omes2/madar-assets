@@ -505,3 +505,5 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .gleg{display:flex;align-items:center;gap:8px 18px;flex-wrap:wrap;padding:10px 6px 2px;font-size:13.5px;line-height:1.4}
 .gleg span{display:inline-flex;align-items:center;gap:7px} .gleg i{width:13px;height:13px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
 @media (prefers-reduced-motion:reduce){.gpin.mv i{animation:none}}
+
+.dmaph{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 8px 10px} .dmaph h3{margin:0}
