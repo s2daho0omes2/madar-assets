@@ -77,11 +77,19 @@ const descendants=id=>{ const out=[]; const walk=p=>Store.coll('assets').filter(
 const OP_TYPES=['تشغيل ذاتي','مستثمر'];
 const agreementFor=assetId=>{ let x=Store.get('assets',assetId); while(x){ const k=Store.coll('contracts').find(k=>OP_TYPES.includes(k.type)&&k.assetId===x.id); if(k) return k; x=x.parentId?Store.get('assets',x.parentId):null; } return null; };
 /* ربح كل اتفاقية: مستثمر = ما يدفعه المستثمر − ما ندفعه للهيئة. تشغيل ذاتي = الإيراد الفعلي − المصروفات − ما ندفعه للهيئة */
-const agreementPL=k=>{ const F=Store.coll('finance').filter(f=>(f.contractId||agreementFor(f.assetId)?.id)===k.id); const rev=sum(F.filter(f=>f.kind==='إيراد'),'amount'), exp=sum(F.filter(f=>f.kind==='مصروف'),'amount'); const pay=Number(k.payToAuthority)||0, due=Number(k.payFromInvestor)||0; const profit=k.type==='مستثمر'?due-pay:rev-exp-pay; return {rev,exp,pay,due,profit,margin:pct(profit,k.type==='مستثمر'?due:rev)}; };
+/* العقد الساري فقط يدخل في الإجماليات: المسودة والملغي تُعرض أرقامها كمتوقعة فقط */
+const AG_LIVE=k=>!/مسودة|ملغي/.test(String(k.status||''));
+/* قيمة الأصل: قيمته المسجلة، وإن لم تُسجل فمجموع قيم ما تحته */
+const assetVal=id=>{ const kids=new Map(); Store.coll('assets').forEach(a=>{ if(a.parentId){ if(!kids.has(a.parentId)) kids.set(a.parentId,[]); kids.get(a.parentId).push(a); } });
+  const val=x=>{ const v=Number(x.value)||0; return v||(kids.get(x.id)||[]).reduce((t,c)=>t+val(c),0); }; const a=Store.get('assets',id); return a?val(a):0; };
+const agreementPL=k=>{ const F=Store.coll('finance').filter(f=>(f.contractId||agreementFor(f.assetId)?.id)===k.id); let rev=sum(F.filter(f=>f.kind==='إيراد'),'amount'); const exp=sum(F.filter(f=>f.kind==='مصروف'),'amount'); let pay=Number(k.payToAuthority)||0, due=Number(k.payFromInvestor)||0, revEst=false;
+  if(k.type!=='مستثمر'&&!F.some(f=>f.kind==='إيراد')){ const set=new Set([k.assetId,...descendants(k.assetId).map(x=>x.id)]); const rr=sum(Store.coll('assets').filter(u=>u.level==='unit'&&set.has(u.id)&&u.occupancy==='مشغول'),'rent'); if(rr){ rev=rr; revEst=true; } }
+  const inv=k.type==='مستثمر', plan={pay,due,profit:inv?due-pay:rev-exp-pay}; const live=AG_LIVE(k); if(!live){ pay=0; due=0; }
+  const profit=inv?due-pay:rev-exp-pay; return {rev,exp,pay,due,profit,margin:pct(profit,inv?due:rev),live,plan,revEst}; };
 /* قراءات تشغيلية لكل اتفاقية: الأصول والوحدات تحتها، الإشغال، المتأخرات */
 const agreementOps=k=>{ const set=new Set([k.assetId,...descendants(k.assetId).map(x=>x.id)]); const units=Store.coll('assets').filter(x=>x.level==='unit'&&set.has(x.id)); const occ=units.filter(u=>u.occupancy==='مشغول').length;
   const overdue=finOf(Store.coll('payments').filter(p=>set.has(p.assetId))).overdue;
-  return {assets:set.size,units:units.length,occ,occPct:pct(occ,units.length),overdue,daysLeft:daysTo(k.end),value:Number(Store.get('assets',k.assetId)?.value)||0}; };
+  return {assets:set.size,units:units.length,occ,occPct:pct(occ,units.length),overdue,daysLeft:daysTo(k.end),value:assetVal(k.assetId)}; };
 const AG_LABEL={'تشغيل ذاتي':'التشغيل الذاتي','مستثمر':'إسناد التشغيل لمستثمر'};
 const agPill=k=>k?`<span class="pill ${k.type==='مستثمر'?'info':'gold'}">${AG_LABEL[k.type]}${k.type==='مستثمر'?' · '+esc(k.party):''}</span>`:'<span class="pill">غير مرتبط</span>';
 const agPlain=k=>k?`${AG_LABEL[k.type]} - ${k.title}`:'غير مرتبط';
@@ -263,7 +271,7 @@ function portfolioMetrics(all){
   const omYear=sum(omContracts(),'value');
   const cf=[0,1,2].map(i=>{ const d=new Date(); d.setMonth(d.getMonth()+i,1); const mo=d.toISOString().slice(0,7);
     return {mo,tenants:P.filter(p=>(p.dueDate||'').startsWith(mo)).reduce((s,p)=>s+Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0)),0),invIn:invNoi/12,auth:pay/12,om:omYear/12}; });
-  return {noi,selfNoi,invNoi,pay,profit,value,yieldOn:value?noi/value*100:0,coverage:pay?noi/pay:0,units:units.length,occ:occ.length,pgi,occRent,vacancyLoss:pgi-occRent,vacant:vacant.length,unpriced,dueAmt,duePaid,collection:dueAmt?duePaid/dueAmt*100:100,aging,arrears,wale:wi?w/wi:0,expiry,conc,concTot:sum(conc,'v'),cf};
+  return {noi,selfNoi,invNoi,pay,profit,value,yieldOn:value?noi/value*100:0,coverage:pay?noi/pay:0,units:units.length,occ:occ.length,pgi,occRent,vacancyLoss:pgi-occRent,vacant:vacant.length,unpriced,dueAmt,duePaid,collection:dueAmt?duePaid/dueAmt*100:null,aging,arrears,wale:wi?w/wi:0,expiry,conc,concTot:sum(conc,'v'),cf};
 }
 /* لوحة الرئيس التنفيذي: رقم واحد أولاً، ثم أين يذهب الدخل، ثم ما يحتاج قراراً، ثم المؤشرات والتفاصيل */
 M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'الرئيسية',render(v){
@@ -291,9 +299,11 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
   all.filter(x=>x.h.score<40).forEach(x=>D.push({amt:Math.abs(x.profit),u:x.profit<0?'خسارة سنوية':'ربح سنوي',tone:'bad',go:x.k.type==='مستثمر'?'#investor':'#operations',t:`${nm(x)}: صحة الاتفاقية ${x.h.score} من 100`,s:x.h.weakest?`أضعف عنصر: ${x.h.weakest.l}.`:''}));
   if(noPay.length) D.push({amt:0,w:PM.noi,tone:'warn',go:'#contracts',t:`${agN(noPay.length)} بلا مبلغ محدد للهيئة الملكية`,s:'الأرباح المعروضة أعلى من الحقيقة حتى يُدخل المبلغ في الاتفاقية.'});
   if(PM.unpriced) D.push({amt:0,w:1,tone:'warn',go:'#operations',t:`${PM.unpriced} وحدة بلا إيجار محدد`,s:'الدخل الممكن والإشغال الاقتصادي لا يحسبانها.'});
+  all.filter(x=>!x.live).forEach(x=>D.push({amt:x.plan.profit,u:'ربح سنوي متوقع',tone:'warn',go:x.k.type==='مستثمر'?'#investor':'#operations',t:`${nm(x)}: العقد ${x.k.status} ولم يُوقَّع`,s:'أرقامه لا تدخل في إجماليات المحفظة حتى توقيعه وتغيير حالته إلى «ساري».'}));
+  if(all.some(x=>x.revEst)) D.push({amt:0,w:1,tone:'warn',go:'#finance',t:'دخل التشغيل الذاتي محسوب من الإيجارات المتعاقد عليها',s:'لا توجد قيود تحصيل مسجلة، فالدخل المعروض هو الإيجار السنوي للوحدات المؤجرة. سجّل التحصيل الفعلي في المالية لتصبح الأرقام فعلية.'});
   D.sort((a,b)=>(b.w??b.amt)-(a.w??a.amt));
   /* المؤشرات الحيوية */
-  const occE=pct(PM.occRent,PM.pgi), col=Math.round(PM.collection);
+  const occE=pct(PM.occRent,PM.pgi), col=PM.collection==null?null:Math.round(PM.collection);
   const vit=(l,val,cls,word,w,tick,note)=>`<div class="dv"><div class="l">${l}</div><div class="v">${val} <span class="pill ${cls}">${word}</span></div><div class="dmeter"><i class="${cls}" style="width:${Math.max(2,Math.min(100,w))}%"></i>${tick!=null?`<u style="inset-inline-start:${tick}%"></u>`:''}</div><div class="s">${note}</div></div>`;
   const cC=PM.coverage>=1.5?'ok':PM.coverage>=1.1?'warn':'bad', oC=occE>=90?'ok':occE>=75?'warn':'bad', lC=col>=95?'ok':col>=85?'warn':'bad', wC=PM.wale>=2?'ok':PM.wale>=1?'warn':'bad';
   const left=d=>d==null?'—':d<0?'<span class="pill bad">منتهٍ</span>':d<=90?`<span class="pill bad">${d} يوم</span>`:d<365?`${Math.round(d/30)} شهر`:`${(d/365).toFixed(1)} سنة`;
@@ -332,7 +342,7 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
   </div>
   <div class="card mb dkpis">
     ${big('الوحدات المؤجرة',`${occP}%`,occP>=90?'ok':occP>=75?'warn':'bad',occP>=90?'ممتاز':occP>=75?'متوسط':'ضعيف',`${PM.occ} من ${PM.units} وحدة في التشغيل الذاتي`)}
-    ${big('التحصيل من المستأجرين',`${col}%`,lC,lC==='ok'?'ممتاز':lC==='warn'?'مقبول':'ضعيف',PM.arrears?`متأخرات ${short(PM.arrears)}`:'لا توجد متأخرات')}
+    ${col==null?big('التحصيل من المستأجرين','—','warn','لا توجد بيانات','لم تُسجل جداول دفعات للمستأجرين بعد'):big('التحصيل من المستأجرين',`${col}%`,lC,lC==='ok'?'ممتاز':lC==='warn'?'مقبول':'ضعيف',PM.arrears?`متأخرات ${short(PM.arrears)}`:'لا توجد متأخرات')}
     ${big('عقود تنتهي خلال 90 يوماً',ending.length,ending.length?'bad':'ok',ending.length?'تحتاج قراراً':'لا يوجد',ending.length?ending.map(x=>esc(nm(x))).join('، '):'كل العقود سارية لأكثر من 90 يوماً')}
   </div>
   <div class="card mb" style="padding:8px"><div class="dmaph"><h3>مواقع المشاريع</h3><span class="small muted">${gpins.length?'اضغط أي موقع لعرض ملخصه':'لم تُربط مواقع بعد'}</span><span class="sp"></span><a class="btn sm" href="#gis">${gpins.length?'تعديل المواقع':'حدّد مواقع المشاريع'}</a></div>
@@ -391,8 +401,8 @@ const AssetView={mode:'agreement',ag:'',open:null};
 M.assets={key:'assets',label:'سجل الأصول',icon:'🏗️',group:'الأساسي',render(v){
   const A=Store.coll('assets'); const st=AssetView;
   const grp=t=>A.filter(x=>(agreementFor(x.id)?.type||'none')===t);
-  const card=(t,label,icon,color)=>{ const L=grp(t), ks=t==='none'?[]:opAgreements().filter(k=>k.type===t); const units=L.filter(x=>x.level==='unit'), occ=units.filter(u=>u.occupancy==='مشغول').length; const val=sum(ks.map(k=>Store.get('assets',k.assetId)||{}),'value');
-    return `<div class="card kpi agc ${st.ag===t?'sel':''}" data-ag="${t}" style="--kc:${color}"><div class="l">${icon} ${label}${t!=='none'?` · ${ks.length} اتفاقية`:''}</div><div class="v">${L.length} <span class="small muted">أصل</span></div><div class="s">${units.length} وحدة${units.length?` · إشغال ${pct(occ,units.length)}%`:''}${val?` · القيمة ${short(val)}`:''}</div></div>`; };
+  const card=(t,label,icon,color)=>{ const L=grp(t), ks=t==='none'?[]:opAgreements().filter(k=>k.type===t); const units=L.filter(x=>x.level==='unit'), occ=units.filter(u=>u.occupancy==='مشغول').length; const val=ks.reduce((t,k)=>t+assetVal(k.assetId),0), nb=L.filter(x=>x.level==='building').length;
+    return `<div class="card kpi agc ${st.ag===t?'sel':''}" data-ag="${t}" style="--kc:${color}"><div class="l">${icon} ${label}${t!=='none'?` · ${ks.length} اتفاقية`:''}</div><div class="v">${units.length} <span class="small muted">وحدة</span></div><div class="s">${nb} مبنى${units.length&&t==='تشغيل ذاتي'?` · إشغال ${pct(occ,units.length)}%`:''}${val?` · القيمة ${short(val)}`:''}</div></div>`; };
   v.innerHTML=`<div class="grid g3 mb">${card('تشغيل ذاتي','التشغيل الذاتي <span class="en">Self-Operation</span>','🏠','var(--wood)')}${card('مستثمر','إسناد التشغيل لمستثمر <span class="en">Investor-Operated</span>','🤝','var(--sky)')}${card('none','غير مرتبط باتفاقية','⚪','var(--muted)')}</div>
     ${st.ag?`<div class="toolbar"><span class="pill ${st.ag==='مستثمر'?'info':st.ag==='none'?'':'gold'}">عرض: ${st.ag==='none'?'غير مرتبط':AG_LABEL[st.ag]}</span><button class="btn sm" id="clrAg">✕ عرض الكل</button></div>`:''}
     <div class="tabs"><button class="active" data-t="tree">هيكل الأصول</button><button data-t="table">الجدول</button></div><div id="aTree"></div><div id="aTable" class="hidden"></div>`;
@@ -523,16 +533,16 @@ M.contracts={key:'contracts',label:'العقود',icon:'📜',group:'الأسا�
 /* 7. الإدارة المالية */
 M.finance={key:'finance',label:'المالية',icon:'💰',group:'الأساسي',render(v){
   const F=Store.coll('finance'), rev=sum(F.filter(f=>f.kind==='إيراد'),'amount'), exp=sum(F.filter(f=>f.kind==='مصروف'),'amount');
-  const val=sum(Store.coll('assets').filter(a=>a.level==='district'),'value');
+  const val=opAgreements().reduce((t,k)=>t+assetVal(k.assetId),0);
   const months=[...new Set(F.map(f=>f.date.slice(0,7)))].sort().slice(-12);
-  const ops=opAgreements(); const rowsK=ops.map(k=>({k,...agreementPL(k)}));
+  const ops=opAgreements(); const rowsK=ops.map(k=>({k,...agreementPL(k)})), estRev=sum(rowsK.filter(x=>x.revEst),'rev');
   const unlinked=F.filter(f=>!(f.contractId||agreementFor(f.assetId))); const uR=sum(unlinked.filter(f=>f.kind==='إيراد'),'amount'), uE=sum(unlinked.filter(f=>f.kind==='مصروف'),'amount');
   const byType={}; rowsK.forEach(x=>{ const t=x.k.type; byType[t]=byType[t]||{rev:0,exp:0,pay:0,due:0,profit:0,n:0}; ['rev','exp','pay','due','profit'].forEach(f=>byType[t][f]+=x[f]); byType[t].n++; });
   const cats={}; F.filter(f=>f.kind==='مصروف').forEach(f=>cats[f.category]=(cats[f.category]||0)+Number(f.amount));
   v.innerHTML=`<div class="grid g4 mb">
-    <div class="card kpi"><div class="l">قيمة الأصول</div><div class="v">${short(val)}</div></div>
-    <div class="card kpi" style="--kc:var(--gold)"><div class="l">الإيرادات</div><div class="v">${short(rev)}</div></div>
-    <div class="card kpi" style="--kc:var(--wood)"><div class="l">المصروفات / تكلفة التشغيل</div><div class="v">${short(exp)}</div><div class="s">${pct(exp,rev)}% من الإيراد</div></div>
+    <div class="card kpi"><div class="l">قيمة الأصول</div><div class="v">${val?short(val):'—'}</div>${val?'':'<div class="s">لم تُسجَّل قيمة لأي مشروع. أدخلها من سجل الأصول</div>'}</div>
+    <div class="card kpi" style="--kc:var(--gold)"><div class="l">الإيرادات</div><div class="v">${short(rev+estRev)}</div>${estRev?`<div class="s">منها ${short(estRev)} محسوبة من إيجارات الوحدات المؤجرة، لعدم وجود قيود تحصيل</div>`:''}</div>
+    <div class="card kpi" style="--kc:var(--wood)"><div class="l">المصروفات / تكلفة التشغيل</div><div class="v">${short(exp)}</div><div class="s">${pct(exp,rev+estRev)}% من الإيراد</div></div>
     <div class="card kpi" style="--kc:var(--sky)"><div class="l">صافي ربحنا بعد سداد الهيئة</div><div class="v">${short(sum(rowsK,'profit'))}</div><div class="s">ندفع للهيئة ${short(sum(rowsK,'pay'))} · العائد على القيمة ${val?(sum(rowsK,'profit')/val*100).toFixed(2):'—'}%</div></div></div>
   <div class="grid g2 mb"><div class="card"><h3>الاتجاه الشهري</h3><div class="chart"><canvas id="f1"></canvas></div></div><div class="card"><h3>ربحنا حسب نوع الاتفاقية</h3><div class="grid g2">${Object.entries(byType).map(([t,x])=>`<div class="card kpi" style="padding:12px;--kc:${t==='مستثمر'?'var(--sky)':'var(--wood)'}"><div class="l">${esc(AG_LABEL[t]||t)} · ${x.n} اتفاقية</div><div class="v" style="font-size:20px">${short(x.profit)}</div><div class="s">${t==='مستثمر'?`يدفع لنا ${short(x.due)}`:`إيراد ${short(x.rev)} · مصروف ${short(x.exp)}`} · للهيئة ${short(x.pay)}</div></div>`).join('')}</div><div class="chart" style="height:170px;margin-top:10px"><canvas id="f2"></canvas></div></div></div>
   <div class="grid g2 mb"><div class="card"><h3>المصروفات حسب التصنيف</h3><div class="chart" style="height:200px"><canvas id="f3"></canvas></div></div><div class="card" style="grid-column:1/-1;order:-1"><h3>الربح حسب الاتفاقية</h3><div class="twrap"><table class="tbl"><thead><tr><th>الاتفاقية</th><th>النوع</th><th>الإيراد الفعلي</th><th>المصروف</th><th>يدفع لنا المستثمر</th><th>ندفع للهيئة</th><th>ربحنا</th><th>الهامش</th></tr></thead><tbody>${rowsK.map(x=>`<tr><td>${esc(x.k.title)}<div class="small muted">${assetPlain(x.k.assetId)}</div></td><td>${pill(AG_LABEL[x.k.type])}</td><td>${num(x.rev)}</td><td>${x.k.type==='مستثمر'?'<span class="muted small">على المستثمر</span>':num(x.exp)}</td><td>${x.k.type==='مستثمر'?num(x.due):'—'}</td><td>${x.k.payToAuthority===''||x.k.payToAuthority==null?'<span class="pill warn">غير محدد</span>':num(x.pay)}</td><td><b>${num(x.profit)}</b></td><td>${x.margin}%</td></tr>`).join('')}${uR||uE?`<tr><td class="muted">حركات غير مرتبطة باتفاقية</td><td>—</td><td>${num(uR)}</td><td>${num(uE)}</td><td>—</td><td>—</td><td>${num(uR-uE)}</td><td>—</td></tr>`:''}</tbody></table></div><div class="small muted" style="margin-top:6px">مستثمر: ربحنا = ما يدفعه المستثمر − ما ندفعه للهيئة. تشغيل ذاتي: ربحنا = الإيراد − المصروف − ما ندفعه للهيئة.</div></div></div>
@@ -582,10 +592,11 @@ function reqEditor(kid,after){
 }
 
 /* بطاقة اتفاقية تشغيلية (تُستخدم في صفحتي التشغيل الذاتي والإسناد) */
-function agCard(k){ const p=agreementPL(k), o=agreementOps(k), inv=k.type==='مستثمر', d=daysTo(k.end);
+function agCard(k){ const p0=agreementPL(k), p=p0.live?p0:Object.assign({},p0,p0.plan,{margin:pct(p0.plan.profit,k.type==='مستثمر'?p0.plan.due:p0.rev)}), o=agreementOps(k), inv=k.type==='مستثمر', d=daysTo(k.end);
   const span=k.start&&k.end?Math.max(1,(new Date(k.end)-new Date(k.start))/86400000):0, used=span?Math.min(100,Math.max(0,Math.round((new Date(todayStr())-new Date(k.start))/86400000/span*100))):0;
   return `<div class="card agcard ${inv?'inv':'self'}" data-k="${k.id}">
-    <div class="agth"><div><b>${esc(inv?k.party:k.title)}</b><div class="small muted">${esc(inv?k.title:assetPlain(k.assetId))} · ${esc(k.number)}</div></div><div style="display:flex;gap:6px;align-items:center">${d==null?'':pill(d<0?'منتهي':d<=90?`ينتهي خلال ${d} يوم`:'ساري')}${healthBadge(k)}</div></div>
+    <div class="agth"><div><b>${esc(inv?k.party:k.title)}</b><div class="small muted">${esc(inv?k.title:assetPlain(k.assetId))} · ${esc(k.number)}</div></div><div style="display:flex;gap:6px;align-items:center">${!p0.live?pill(k.status):d==null?'':pill(d<0?'منتهي':d<=90?`ينتهي خلال ${d} يوم`:'ساري')}${healthBadge(k)}</div></div>
+    ${p0.live?'':`<div class="small" style="margin:6px 0;color:var(--amber)">العقد ${esc(k.status)}: الأرقام أدناه متوقعة بعد التوقيع، ولا تدخل في إجماليات المحفظة حتى تصبح حالته «ساري».</div>`}${p0.revEst?'<div class="small muted" style="margin:6px 0">الدخل محسوب من إيجارات الوحدات المؤجرة، لعدم وجود قيود تحصيل مسجلة.</div>':''}
     <div class="mk">
       ${inv?`<div><div class="l">يدفع لنا</div><b>${num(p.due)}</b></div><div><div class="l">المحصّل</div><b>${num(p.rev)}</b> <span class="small muted">${pct(p.rev,p.due)}%</span></div>`:`<div><div class="l">الدخل</div><b>${num(p.rev)}</b></div><div><div class="l">التكاليف</div><b>${num(p.exp)}</b></div>`}
       <div><div class="l">ندفع للهيئة</div><b>${k.payToAuthority===''||k.payToAuthority==null?'<span class="pill warn">غير محدد</span>':num(p.pay)}</b></div>
@@ -612,7 +623,7 @@ M.investor={key:'investor',label:'إسناد التشغيل لمستثمر',icon
     <div class="card kpi" style="--kc:var(--gold)"><div class="l">المحصّل فعلياً</div><div class="v">${short(got)}</div><div class="s">نسبة التحصيل ${pct(got,due)}%</div><div class="bar gold" style="margin-top:6px"><i style="width:${Math.min(100,pct(got,due))}%"></i></div></div>
     <div class="card kpi" style="--kc:var(--amber)"><div class="l">ندفع للهيئة</div><div class="v">${short(pay)}</div></div>
     <div class="card kpi" style="--kc:var(--sky)"><div class="l">صافي ربحنا</div><div class="v">${short(prof)}</div><div class="s">هامش ${pct(prof,due)}%</div></div>
-    <div class="card kpi" style="--kc:var(--wood)"><div class="l">الأصول المسندة</div><div class="v">${sum(L,'assets')}</div><div class="s">${sum(L,'units')} وحدة · قيمة ${short(sum(L,'value'))}</div></div>
+    <div class="card kpi" style="--kc:var(--wood)"><div class="l">الوحدات المسندة</div><div class="v">${sum(L,'units')}</div><div class="s">${L.reduce((t,x)=>t+descendants(x.k.assetId).filter(a=>a.level==='building').length,0)} مبنى${sum(L,'value')?` · قيمة ${short(sum(L,'value'))}`:' · القيمة غير مسجلة'}</div></div>
     <div class="card kpi" style="--kc:var(--red)"><div class="l">عقود تنتهي خلال 90 يوم</div><div class="v">${ending.length}</div><div class="s">${ending.map(x=>esc(x.k.party)).join('، ')||'—'}</div></div>
     ${(()=>{ const R=Store.coll('requirements').filter(r=>K.some(k=>k.id===r.contractId)), st=reqStats(R); return `<div class="card kpi" style="--kc:var(--green)"><div class="l">متطلبات العقود المنجزة</div><div class="v">${st.done} / ${st.total}</div><div class="s">${st.prog} قيد التنفيذ</div><div class="bar" style="margin-top:6px"><i style="width:${pct(st.done,st.total)}%"></i></div></div><div class="card kpi" style="--kc:var(--red)"><div class="l">متطلبات متأخرة</div><div class="v">${st.late}</div><div class="s">${R.filter(r=>reqState(r)==='late').map(r=>esc(r.title)).join('، ')||'لا يوجد'}</div></div>`; })()}
   </div>
@@ -1132,12 +1143,12 @@ function agreementCF(k,months){
   const OM=Store.coll('contracts').filter(x=>x.type==='تشغيل وصيانة'&&agreementFor(x.assetId)?.id===k.id);
   const MT=Store.coll('meters').filter(m=>meterAg(m)?.id===k.id&&m.payer!=='المستأجر'), MB=Store.coll('meterBills').filter(b=>MT.some(m=>m.id===b.meterId));
   const isOm=f=>f.category==='عقد تشغيل وصيانة', isMt=f=>String(f.category||'').startsWith('فاتورة');
-  const actual=mo=>{ const E=F.filter(f=>f.date.startsWith(mo)); return {self:self?sum(E.filter(f=>f.kind==='إيراد'),'amount'):0,inv:self?0:sum(E.filter(f=>f.kind==='إيراد'),'amount'),auth:sched(k.payToAuthority,k.period,k.start,k.end,mo),om:sum(E.filter(f=>f.kind==='مصروف'&&isOm(f)),'amount'),meters:sum(MB.filter(b=>b.period===mo),'amount'),other:sum(E.filter(f=>f.kind==='مصروف'&&!isOm(f)&&!isMt(f)),'amount')}; };
+  const actual=mo=>{ const E=F.filter(f=>f.date.startsWith(mo)); return {self:self?sum(E.filter(f=>f.kind==='إيراد'),'amount'):0,inv:self?0:sum(E.filter(f=>f.kind==='إيراد'),'amount'),auth:AG_LIVE(k)?sched(k.payToAuthority,k.period,k.start,k.end,mo):0,om:sum(E.filter(f=>f.kind==='مصروف'&&isOm(f)),'amount'),meters:sum(MB.filter(b=>b.period===mo),'amount'),other:sum(E.filter(f=>f.kind==='مصروف'&&!isOm(f)&&!isMt(f)),'amount')}; };
   const last6=[0,1,2,3,4,5].map(i=>addMo(cur,-i)).map(actual), avg=key=>last6.reduce((s,x)=>s+x[key],0)/6;
   const mAvg=(()=>{ const per=[...new Set(MB.map(b=>b.period))].sort().slice(-6); return per.length?sum(MB.filter(b=>per.includes(b.period)),'amount')/per.length:0; })();
   const run={self:avg('self'),other:avg('other')};
   const rows={}; [...CF_IN,...CF_OUT].forEach(c=>rows[c.k]=[]);
-  months.forEach(mo=>{ let r; if(mo<=cur) r=actual(mo); else r={self:self?run.self:0,inv:self?0:sched(k.payFromInvestor,k.period,k.start,k.end,mo),auth:sched(k.payToAuthority,k.period,k.start,k.end,mo),om:OM.reduce((s,x)=>s+sched(x.value,x.period,x.start,x.end,mo),0),meters:mAvg,other:self?run.other:0};
+  const live=AG_LIVE(k); months.forEach(mo=>{ let r; if(mo<=cur) r=actual(mo); else r={self:self?run.self:0,inv:self||!live?0:sched(k.payFromInvestor,k.period,k.start,k.end,mo),auth:live?sched(k.payToAuthority,k.period,k.start,k.end,mo):0,om:OM.reduce((s,x)=>s+sched(x.value,x.period,x.start,x.end,mo),0),meters:mAvg,other:self?run.other:0};
     Object.keys(rows).forEach(key=>rows[key].push(Math.round(r[key]||0))); });
   return rows;
 }
