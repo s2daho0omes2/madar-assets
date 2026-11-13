@@ -1347,6 +1347,24 @@ M.whatif={key:'whatif',label:'دراسة وتحليل الفرصة',icon:'🔍',
   const STRESS=[['الإشغال أقل بـ10 نقاط',{qOcc:val.qOcc-10}],['الإيجار أقل 10%',{qRent:val.qRent*0.9}],['التكاليف أعلى 15%',{fixed:val.fixed*1.15,varPct:val.varPct*1.15,maint:val.maint*1.15,util:val.util*1.15}],['الصيانة أعلى 30%',{maint:val.maint*1.3}],['تأخر بدء الإيرادات 6 أشهر',{setupM:val.setupM+6}],['التحصيل 85%',{coll:Math.min(val.coll,85)}],['العائد المطلوب +2%',{disc:val.disc+2}]].map(([l,o])=>{ const d=wiDecide(val,o); return {l,team:d.R.team.val,inv:d.R.inv.val,best:d.best}; });
   const REC_OK=val.qUnits>0&&val.qRent>0, RI=val.qOffer?R.inv:wiSim(val,'inv',{qOffer:A.minOffer||0});
   const RX=D.best==='inv'?RI:R.team;
+  /* المؤشرات المالية المتعارف عليها لكل نموذج */
+  const finOf2=(X,o)=>{ const sm=k=>X.rows.reduce((t,r)=>t+r[k],0), rev=sm('rev'), noi=(rev+sm('opex')+sm('maint')+sm('util'))/X.H, authA=-sm('auth')/X.H, inv0=X.peak<-1?-X.peak:0, rate=wiRate(val,o), npv=X.npv(rate);
+    return {rate,npv,irr:X.irr,pb:wiPb(X),inv0,roi:inv0?X.total/inv0*100:null,pi:inv0?(npv+inv0)/inv0:null,noi,margin:rev?sm('profit')/rev*100:null,cov:authA>1?noi/authA:null}; };
+  const FNS=finOf2(R.team,'team'), FNI=finOf2(RI,'inv'), na='<span class="muted">لا ينطبق</span>', pc=x=>x==null?na:`${x.toFixed(1)}%`, tm=x=>x==null?na:`${x.toFixed(2)} مرة`;
+  const FROWS=[
+    ['صافي القيمة الحالية','NPV',short(FNS.npv),short(FNI.npv),`قيمة أرباح المدة كلها بريالات اليوم، بعد خصم العائد المطلوب وعلاوة المخاطر (${FNS.rate.toFixed(1)}% للذاتي و${FNI.rate.toFixed(1)}% للإسناد). الموجب يعني أن المشروع يتجاوز العائد المطلوب.`,FNS.npv>=FNI.npv],
+    ['معدل العائد الداخلي','IRR',pc(FNS.irr),pc(FNI.irr),`العائد السنوي الفعلي على ما تستثمره. يُقارن بالعائد المطلوب ${val.disc}%. لا ينطبق إن لم يوجد استثمار أولي.`,null],
+    ['فترة الاسترداد','Payback Period',FNS.pb,FNI.pb,'المدة حتى تسترجع كل ما صرفته. الأقصر أقل مخاطرة.',null],
+    ['العائد على الاستثمار','ROI',pc(FNS.roi),pc(FNI.roi),'مجموع ربح المدة مقسوماً على أقصى مبلغ تضعه في المشروع.',null],
+    ['مؤشر الربحية','PI',FNS.pi==null?na:FNS.pi.toFixed(2),FNI.pi==null?na:FNI.pi.toFixed(2),'كل ريال تستثمره يعود بكم ريال بقيمة اليوم. أعلى من 1 يعني مجدياً.',null],
+    ['صافي الدخل التشغيلي السنوي','NOI',short(FNS.noi),short(FNI.noi),'الدخل ناقص تكاليف التشغيل، قبل ما تدفعه للهيئة الملكية. متوسط سنوي.',FNS.noi>=FNI.noi],
+    ['هامش صافي الربح','Net Profit Margin',pc(FNS.margin),pc(FNI.margin),'كم يبقى ربحاً من كل 100 ريال دخل.',null],
+    ['تغطية التزام الهيئة الملكية','DSCR',tm(FNS.cov),tm(FNI.cov),'صافي الدخل التشغيلي مقسوماً على ما تدفعه للهيئة. 1.5 مرة فأكثر مريح، وأقل من 1 يعني عجزاً.',null],
+    ['إشغال التعادل','Break-even Occupancy',A.occB==null?na:A.occB>100?'غير ممكن':Math.round(A.occB)+'%',na,'أقل إشغال يبقى معه التشغيل الذاتي رابحاً. لا ينطبق على الإسناد لأن دخله ثابت بالعقد.',null]];
+  const finCard=`<div class="card mb" style="padding:0"><div style="padding:16px 18px 6px"><h3>المؤشرات المالية <span class="small muted">${val.qOffer?'':'عمود الإسناد محسوب على أقل عرض مقبول'}</span></h3></div>
+    <div class="twrap"><table class="tbl wfin"><thead><tr><th>المؤشر</th><th>🏠 التشغيل الذاتي</th><th>🤝 الإسناد لمستثمر</th><th>ماذا يعني</th></tr></thead><tbody>
+    ${FROWS.map(r=>`<tr><td><b>${r[0]}</b><span class="abbr" dir="ltr">${r[1]}</span></td><td class="v ${val.qOffer&&r[5]===true?'win':''}">${r[2]}</td><td class="v ${val.qOffer&&r[5]===false?'win':''}">${r[3]}</td><td class="small muted">${r[4]}</td></tr>`).join('')}
+    </tbody></table></div></div>`, FX=D.best==='inv'?FNI:FNS;
   const sel=R[st.opt], rowsT=[['الإيرادات المحصّلة','rev'],['عقد الصيانة والإصلاحات','maint'],['العدادات (كهرباء ومياه)','util'],['عملية التشغيل (رواتب وحراسة ونظافة وإدارة)','opex'],['المسدد للهيئة الملكية والالتزامات الأخرى','auth'],['التجهيز والتجديدات والسيولة','capex'],['التمويل (سحب وسداد)','fin'],['الزكاة والضرائب','zakat']].filter(([,key])=>sel.rows.some(r=>Math.abs(r[key])>0.5));
   v.innerHTML=`${toolbar}
   <div class="card mb"><div class="wsumh"><h3>إجاباتك</h3><span class="small muted">اضغط أي إجابة لتعديلها</span><span class="sp"></span><button class="btn sm" id="wzRe">مراجعة الأسئلة من البداية</button></div>
@@ -1356,8 +1374,9 @@ M.whatif={key:'whatif',label:'دراسة وتحليل الفرصة',icon:'🔍',
       <div class="wrc-main"><div class="wrc-eye">التوصية</div><h2>${D.best&&REC_OK?WI_OPTS[D.best].ic+' ':''}${esc(A.title.replace('التوصية: ',''))}</h2>${A.action?`<p>${esc(A.action)}</p>`:''}</div>
       ${REC_OK?`<div class="wrc-stats">
         <div><span>مجموع الربح على ${wiYrs(RX.H)}</span><b class="${RX.total<0?'neg':''}">${short(RX.total)}</b></div>
-        <div><span>متوسط الربح السنوي</span><b class="${RX.avgProfit<0?'neg':''}">${short(RX.avgProfit)}</b></div>
-        ${D.best==='team'?`<div><span>حد الإشغال الآمن</span><b>${A.occB>100?'غير ممكن':Math.round(A.occB)+'%'}</b></div>`:`<div><span>${val.qOffer?'عرض المستثمر':'أقل عرض مقبول'}</span><b>${short(val.qOffer||A.minOffer||0)}</b></div>`}
+        <div><span>صافي القيمة الحالية <em dir="ltr">NPV</em></span><b class="${FX.npv<0?'neg':''}">${short(FX.npv)}</b></div>
+        <div><span>العائد الداخلي <em dir="ltr">IRR</em></span><b>${FX.irr==null?'—':FX.irr.toFixed(1)+'%'}</b></div>
+        ${D.best==='team'?`<div><span>إشغال التعادل <em dir="ltr">Break-even</em></span><b>${A.occB>100?'غير ممكن':Math.round(A.occB)+'%'}</b></div>`:`<div><span>${val.qOffer?'عرض المستثمر':'أقل عرض مقبول'}</span><b>${short(val.qOffer||A.minOffer||0)}</b></div>`}
       </div>`:''}
     </div>
     ${A.why.length||A.plan.length?`<div class="wrc-body">
@@ -1373,6 +1392,7 @@ M.whatif={key:'whatif',label:'دراسة وتحليل الفرصة',icon:'🔍',
     <div class="wcsum"><div><span><i style="background:${WI_OPTS.team.c}"></i>التشغيل الذاتي</span><b class="${R.team.total<0?'neg':''}">${short(R.team.total)}</b><small>مجموع الربح على ${wiYrs(R.team.H)}</small></div>
       <div><span><i style="background:${WI_OPTS.inv.c}"></i>${val.qOffer?'الإسناد لمستثمر':'الإسناد بأقل عرض مقبول'}</span><b class="${RI.total<0?'neg':''}">${short(RI.total)}</b><small>مجموع الربح على ${wiYrs(RI.H)}</small></div>
       <div><span>الفرق لصالح ${R.team.total>=RI.total?'التشغيل الذاتي':'الإسناد'}</span><b>${short(Math.abs(R.team.total-RI.total))}</b><small>قبل احتساب المخاطر</small></div></div></div>`:''}
+  ${REC_OK?finCard:''}
   <div class="grid g2 mb wopts">${['team','inv'].map(optCard).join('')}</div>
   <div class="grid g2 mb">
     <div class="card"><h3>اختبار الضغط <span class="small muted">القيمة الحالية لكل بديل لو تغيّر افتراض واحد</span></h3><div class="twrap"><table class="tbl wit"><thead><tr><th>السيناريو</th><th>🏠 التشغيل الذاتي</th><th>🤝 الإسناد لمستثمر</th><th>التوصية</th></tr></thead><tbody>
