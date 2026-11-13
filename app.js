@@ -1337,13 +1337,14 @@ M.whatif={key:'whatif',label:'دراسة وتحليل الفرصة',icon:'🔍',
       <h2 class="wzq">${esc(f.l)}</h2>${f.hint?`<p class="muted wzh">${esc(f.hint)}</p>`:''}
       ${f.opts?`<div class="wzo">${Object.entries(f.opts).map(([a,o])=>`<button type="button" class="wzb ${cur===a?'on':''}" data-a="${a}">${o.l}</button>`).join('')}</div>`
         :`<div class="wzn"><input id="wzI" type="number" inputmode="decimal" ${f.min!=null?`min="${f.min}"`:''} ${f.max!=null?`max="${f.max}"`:''} value="${Math.round(cur/(f.per||1)*100)/100}"><span>${f.u||''}</span></div>
-        ${f.req&&!sug?'<div class="small muted wzs">أدخل الرقم الصحيح لمشروعك</div>':''}<div class="small muted wzs" ${f.req&&!sug?'hidden':''}>المقترح: <b>${Math.round(Number(sug)/(f.per||1)).toLocaleString('en-US')} ${f.u||''}</b>${from?` · ${from}`:''}${f.per&&cur?` · المدخل حالياً يساوي ${Math.round(cur).toLocaleString('en-US')} ر.س سنوياً`:''} ${sug!==cur?`<button type="button" class="lnk" id="wzSug">استخدمه</button>`:''}</div>`}
+        ${f.req&&!sug?'<div class="small muted wzs">أدخل الرقم الصحيح لمشروعك</div>':''}<div class="small muted wzs" ${f.req&&!sug?'hidden':''}>المقترح: <b>${Math.round(Number(sug)/(f.per||1)).toLocaleString('en-US')} ${f.u||''}</b>${from?` · ${from}`:''}${f.per?` · المدخل يساوي <b id="wzYr">${Math.round(cur).toLocaleString('en-US')}</b> ر.س سنوياً`:''} ${sug!==cur?`<button type="button" class="lnk" id="wzSug">استخدمه</button>`:''}</div>`}
       <div class="wzf"><button class="btn" id="wzBack" ${i?'':'disabled'}>السابق</button><span class="sp"></span>${sv.done?'<button class="btn" id="wzRes">النتيجة مباشرة</button>':''}<button class="btn p" id="wzNext">${i===Q.length-1?'عرض النتيجة':'التالي'}</button></div></div>${side}</div>`;
     bindTop();
     const save=x=>{ sv.v[f.id]=x; sv.t[f.id]=1; }, go=j=>{ if(j>=Q.length){ sv.done=1; st.step=null; } else st.step=Math.max(0,j); Store.save(); M.whatif.render(v); window.scrollTo({top:0,behavior:'smooth'}); };
     const readN=()=>{ let x=Number($('#wzI',v).value); if(!isFinite(x)) x=0; if(f.min!=null) x=Math.max(f.min,x); if(f.max!=null) x=Math.min(f.max,x); return x*(f.per||1); };
     v.querySelectorAll('.wzb').forEach(b=>b.onclick=()=>{ v.querySelectorAll('.wzb').forEach(x=>x.classList.remove('on')); b.classList.add('on'); save(b.dataset.a); setTimeout(()=>go(i+1),180); });
-    const inp=$('#wzI',v); if(inp){ inp.focus(); inp.select(); inp.onkeydown=e=>{ if(e.key==='Enter'){ if(need()) return; save(readN()); go(i+1); } }; }
+    const inp=$('#wzI',v); if(inp&&f.per) inp.oninput=()=>{ const y=$('#wzYr',v); if(y) y.textContent=Math.round(Math.max(0,Number(inp.value)||0)*f.per).toLocaleString('en-US'); };
+    if(inp){ inp.focus(); inp.select(); inp.onkeydown=e=>{ if(e.key==='Enter'){ if(need()) return; save(readN()); go(i+1); } }; }
     if($('#wzSug',v)) $('#wzSug',v).onclick=()=>{ $('#wzI',v).value=Math.round(sug/(f.per||1)*100)/100; $('#wzI',v).focus(); };
     const need=()=>{ if(inp&&f.req&&!(Number(inp.value)>0)){ toast('هذا السؤال مطلوب لحساب الدخل',true); inp.focus(); return true; } return false; };
     $('#wzNext',v).onclick=()=>{ if(need()) return; if(inp) save(readN()); else if(!sv.t[f.id]) save(cur); go(i+1); };
