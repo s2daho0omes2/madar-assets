@@ -284,14 +284,18 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
   const obs=obsStats(Store.coll('observations').filter(o=>omContracts().some(k=>k.id===o.contractId)));
   const share=x=>PM.profit>0?`يساهم بـ${per(x,PM.profit)}% من ربح المحفظة`:'';
   const occP=pct(PM.occ,PM.units), big=(l,val,cls,word,note)=>`<div class="dk"><div class="l">${l}</div><div class="v">${val}</div><span class="pill ${cls}">${word}</span><div class="s">${note}</div></div>`;
-  const eq=(l,val,dot,cls='')=>`<div class="de ${cls}"><span>${dot?`<i class="${dot}"></i>`:''}${l}</span><b>${val}</b></div>`;
+  /* كل خانة تُقسم حسب مصدرها: التشغيل الذاتي والإسناد لمستثمر */
+  const eq=(l,val,dot,cls,a,b)=>{ const pos=a>=0&&b>=0&&a+b>0, pa=pos?Math.round(a/(a+b)*100):0;
+    return `<div class="de ${cls||''}"><span>${dot?`<i class="${dot}"></i>`:''}${l}</span><b>${val}</b>
+      ${pos?`<div class="dsp" role="img" aria-label="تشغيل ذاتي ${pa}%، إسناد لمستثمر ${100-pa}%"><i class="s" style="width:${pa}%"></i><i class="n" style="width:${100-pa}%"></i></div>`:''}
+      <div class="dsl"><div><u class="s"></u>تشغيل ذاتي <b>${short(a)}</b>${pos?` <small>${pa}%</small>`:''}</div><div><u class="n"></u>إسناد لمستثمر <b>${short(b)}</b>${pos?` <small>${100-pa}%</small>`:''}</div></div></div>`; };
   v.innerHTML=`
   <div class="dtier">الأساسي</div>
   <section class="dhero mb">
     <div class="dh-top"><div class="dh-eye">${esc(Store.data.settings.projectName)} · <span class="num">${todayStr()}</span></div><a class="dh-al ${bad?'bad':''}" href="#alerts">🔔 ${alerts.length} تنبيه${bad?` · ${bad} حرجة`:''}</a></div>
     <p class="dh-say">${esc(verdict)}</p>
     <div class="deq">
-      ${eq('الدخل السنوي',short(gross))}<em>−</em>${eq('تكاليف التشغيل',short(S('exp')),'c')}<em>−</em>${eq('ندفع للهيئة الملكية',short(PM.pay),'a')}<em>=</em>${eq('صافي الربح',short(PM.profit),'p','res'+(PM.profit<0?' neg':''))}
+      ${eq('الدخل السنوي',short(gross),'','',S('rev'),I('due'))}<em>−</em>${eq('تكاليف التشغيل',short(S('exp')),'c','',S('exp'),0)}<em>−</em>${eq('ندفع للهيئة الملكية',short(PM.pay),'a','',S('pay'),I('pay'))}<em>=</em>${eq('صافي الربح',short(PM.profit),'p','res'+(PM.profit<0?' neg':''),S('profit'),I('profit'))}
     </div>
     ${gross?flow(gross,S('exp'),PM.pay,PM.profit)+`<div class="dh-eye">من كل 100 ريال دخل: ${per(S('exp'))} تكاليف تشغيل، ${per(PM.pay)} للهيئة الملكية، و${PM.profit<0?'لا يبقى ربح':per(PM.profit)+' تبقى ربحاً'}.</div>`:''}
   </section>

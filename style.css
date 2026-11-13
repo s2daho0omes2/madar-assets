@@ -405,7 +405,7 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .dhero{gap:16px} .dh-top{align-items:center}
 .dh-say{font-size:clamp(19px,2.2vw,24px);font-weight:700;margin:0;max-width:none;line-height:1.6}
 .deq{display:flex;align-items:stretch;gap:12px;flex-wrap:wrap}
-.deq em{font-style:normal;font-size:30px;font-weight:300;color:rgba(241,237,228,.5);align-self:center}
+.deq>em{font-style:normal;font-size:30px;font-weight:300;color:rgba(241,237,228,.5);align-self:center}
 .de{flex:1 1 150px;background:rgba(255,255,255,.07);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
 .de span{font-size:13.5px;color:rgba(241,237,228,.75);display:flex;align-items:center;gap:7px}
 .de span i{width:10px;height:10px;border-radius:3px} .de i.c{background:#8fa3b3} .de i.a{background:#b9925a} .de i.p{background:#4fae82}
@@ -420,4 +420,12 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .dk{padding:20px 22px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;border-inline-start:1px solid var(--line)} .dk:first-child{border-inline-start:0}
 .dk .l{font-size:14.5px;color:var(--muted)} .dk .v{font-size:clamp(32px,3.6vw,44px);font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
 .dk .pill{font-size:13px} .dk .s{font-size:13.5px;color:var(--muted)}
-@media(max-width:760px){.dkpis{grid-template-columns:1fr}.dk{border-inline-start:0}.dk+.dk{border-top:1px solid var(--line)}.deq em{display:none}}
+@media(max-width:760px){.dkpis{grid-template-columns:1fr}.dk{border-inline-start:0}.dk+.dk{border-top:1px solid var(--line)}.deq>em{display:none}}
+
+/* تقسيم كل خانة حسب المصدر */
+.dsp{display:flex;height:8px;border-radius:5px;overflow:hidden;gap:2px;margin-top:8px}
+.dsp i{display:block;height:100%} .dsp .s,.dsl u.s{background:#d4a574} .dsp .n,.dsl u.n{background:#6fa3c7}
+.dsl{display:flex;flex-direction:column;gap:3px;margin-top:8px;font-size:13px;color:rgba(241,237,228,.8)}
+.dsl>div{display:flex;align-items:center;gap:6px;flex-wrap:wrap} .dsl u{width:9px;height:9px;border-radius:50%;flex:none;text-decoration:none}
+.dsl b{font-size:13.5px!important;font-weight:700;color:#fff;font-variant-numeric:tabular-nums} .dsl small{font-size:13px;font-weight:700;color:rgba(241,237,228,.6)}
+.de.res .dsl{color:#4a5a66} .de.res .dsl b{color:#16242f!important} .de.res .dsl small{color:#6b7682}
