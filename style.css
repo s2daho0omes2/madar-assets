@@ -331,3 +331,10 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
   .app.nav-off .nav{visibility:hidden;padding:0;overflow:hidden}
 }
 .menu-btn{font-size:18px}
+
+/* معالج إضافة مشروع */
+.nplist{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.nprow{display:flex;justify-content:space-between;gap:12px;padding:10px 14px;font-size:14px} .nprow+.nprow{border-top:1px solid var(--line)}
+.nprow span{color:var(--muted)} .nprow b{text-align:end}
+.np-rec{margin:0}
+.wzn input[type=text],.wzn input[type=date]{font-size:22px}

@@ -149,7 +149,7 @@ function crud(cfg,container){
     $('#pp',container)&&( $('#pp',container).onclick=()=>{ state.page=Math.max(0,state.page-1); render(); });
     $('#pn',container)&&( $('#pn',container).onclick=()=>{ state.page++; render(); });
     container.querySelectorAll('[data-e]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); form(Store.get(cfg.coll,b.dataset.e)); });
-    container.querySelectorAll('[data-d]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); ask('حذف السجل نهائياً؟ لا يمكن التراجع.',()=>{ Store.remove(cfg.coll,b.dataset.d); render(); App.refreshBadges(); },'حذف'); });
+    container.querySelectorAll('[data-d]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); ask('حذف السجل نهائياً؟ لا يمكن التراجع.',()=>{ Store.remove(cfg.coll,b.dataset.d); cfg.onChange?cfg.onChange():render(); App.refreshBadges(); },'حذف'); });
     container.querySelectorAll('tr[data-id]').forEach(tr=>tr.onclick=()=>{ const row=Store.get(cfg.coll,tr.dataset.id); if(cfg.detail) cfg.detail(row); else detailDefault(cfg,row); });
   }
   function form(row){
@@ -161,7 +161,7 @@ function crud(cfg,container){
       cfg.fields.forEach(f=>{ const el=$(`[name="${f.k}"]`); if(!el) return; let v=el.value; if(f.type==='number') v=v===''?'':Number(v); if(f.required&&(v===''||v==null)){ ok=false; el.style.outline='2px solid var(--red)'; } patch[f.k]=v; });
       if(!ok){ toast('أكمل الحقول الإلزامية'); return; }
       if(isNew){ const o=Store.add(cfg.coll,patch); cfg.onSave?.(o,true); } else { Store.update(cfg.coll,row.id,patch); cfg.onSave?.(Store.get(cfg.coll,row.id),false); }
-      Modal.close(); render(); App.refreshBadges(); toast('تم الحفظ');
+      Modal.close(); cfg.onChange?cfg.onChange():render(); App.refreshBadges(); toast('تم الحفظ');
     };
   }
   render();
@@ -485,7 +485,7 @@ const clientOpts=()=>Store.coll('clients').map(c=>({v:c.id,l:c.name}));
 function contractCfg(where,defType){ const c={coll:'contracts',title:'عقد',
     columns:[{k:'number',label:'الرقم'},{k:'type',label:'النوع',fmt:r=>pill(AG_LABEL[r.type]||r.type)},{k:'title',label:'العنوان'},{k:'party',label:'الطرف الآخر',fmt:r=>esc(r.party?.startsWith('C-')?clientName(r.party):r.party)},{k:'assetId',label:'الأصل',fmt:r=>assetName(r.assetId),plain:r=>assetPlain(r.assetId)},{k:'start',label:'البداية',fmt:r=>`<span class="num">${r.start||'—'}</span>`},{k:'end',label:'النهاية',fmt:r=>{const d=daysTo(r.end);return `<span class="num">${r.end||'—'}</span> ${d!=null&&d<=90&&r.type!=='إطارية'&&r.type!=='تخصيص'?pill(d<0?'منتهي':`${d} يوم`):''}`;}},{k:'value',label:'القيمة',fmt:r=>money(r.value)},{k:'payToAuthority',label:'ندفع للهيئة',fmt:r=>OP_TYPES.includes(r.type)?num(r.payToAuthority):'—'},{k:'profit',label:'ربحنا',fmt:r=>OP_TYPES.includes(r.type)?`<b>${num(agreementPL(r).profit)}</b>`:'—',plain:r=>OP_TYPES.includes(r.type)?agreementPL(r).profit:''},{k:'status',label:'الحالة',fmt:r=>pill(r.status)},{k:'renewal',label:'التجديد'}],
     filters:[{k:'type',label:'النوع',options:[{v:'إطارية',l:'إطارية'},{v:'تخصيص',l:'تخصيص'},{v:'تشغيل ذاتي',l:'التشغيل الذاتي'},{v:'مستثمر',l:'إسناد التشغيل لمستثمر'},'تشغيل وصيانة','إيجار','توريد','استشاري']},{k:'status',label:'الحالة',options:['ساري','منتهي','قيد التجديد','ملغي']}],
-    fields:[{k:'number',label:'رقم العقد',required:true},{k:'type',label:'نوع العقد',type:'select',required:true,options:[{v:'إطارية',l:'إطارية'},{v:'تخصيص',l:'تخصيص'},{v:'تشغيل ذاتي',l:'التشغيل الذاتي'},{v:'مستثمر',l:'إسناد التشغيل لمستثمر'},'تشغيل وصيانة','إيجار','توريد','استشاري']},{k:'title',label:'عنوان العقد',required:true,full:true},{k:'party',label:'الطرف الآخر'},{k:'contractorId',label:'المقاول (لعقود التشغيل والصيانة)',type:'select',options:()=>Store.coll('contractors').map(x=>({v:x.id,l:x.name}))},{k:'assetId',label:'الأصل',type:'select',options:assetOpts},{k:'parentId',label:'يستند إلى (عقد أعلى)',type:'select',options:()=>Store.coll('contracts').map(k=>({v:k.id,l:`${k.number} — ${k.title}`}))},{k:'start',label:'تاريخ البداية',type:'date'},{k:'end',label:'تاريخ النهاية',type:'date'},{k:'value',label:'قيمة العقد',type:'number'},{k:'payToAuthority',label:'ما ندفعه للهيئة الملكية عن هذه الاتفاقية',type:'number'},{k:'investment',label:'التكلفة الاستثمارية الأولية (لحساب فترة الاسترداد)',type:'number'},{k:'payFromInvestor',label:'ما يدفعه المستثمر لنا',type:'number'},{k:'period',label:'دورية السداد',type:'select',options:['سنوي','نصف سنوي','ربع سنوي','شهري','دفعة واحدة']},{k:'scope',label:'نطاق العمل (مسؤولية المستثمر أو مسؤوليتنا في التشغيل الذاتي)',type:'textarea',full:true},{k:'status',label:'الحالة',type:'select',options:['ساري','منتهي','قيد التجديد','ملغي'],default:'ساري'},{k:'renewal',label:'التجديد',type:'select',options:['تلقائي','قابل للتجديد','يحتاج قرار','غير قابل']},{k:'obligations',label:'الالتزامات',type:'textarea',full:true},{k:'notes',label:'ملاحظات',type:'textarea',full:true}]}; if(where) c.where=where; c.onSave=o=>{ if(o.contractorId&&!o.party) Store.update('contracts',o.id,{party:Store.get('contractors',o.contractorId)?.name||''}); if(!o.parentId){ const k=agreementFor(o.assetId); if(k&&k.id!==o.id&&!OP_TYPES.includes(o.type)) Store.update('contracts',o.id,{parentId:k.id}); } }; if(defType){ const f=c.fields.find(x=>x.k==='type'); f.default=defType; c.title={'مستثمر':'عقد مستثمر','تشغيل ذاتي':'اتفاقية تشغيل ذاتي','تشغيل وصيانة':'عقد تشغيل وصيانة'}[defType]||'عقد'; } return c; }
+    fields:[{k:'number',label:'رقم العقد',required:true},{k:'type',label:'نوع العقد',type:'select',required:true,options:[{v:'إطارية',l:'إطارية'},{v:'تخصيص',l:'تخصيص'},{v:'تشغيل ذاتي',l:'التشغيل الذاتي'},{v:'مستثمر',l:'إسناد التشغيل لمستثمر'},'تشغيل وصيانة','إيجار','توريد','استشاري']},{k:'title',label:'عنوان العقد',required:true,full:true},{k:'party',label:'الطرف الآخر'},{k:'contractorId',label:'المقاول (لعقود التشغيل والصيانة)',type:'select',options:()=>Store.coll('contractors').map(x=>({v:x.id,l:x.name}))},{k:'assetId',label:'الأصل',type:'select',options:assetOpts},{k:'parentId',label:'يستند إلى (عقد أعلى)',type:'select',options:()=>Store.coll('contracts').map(k=>({v:k.id,l:`${k.number} — ${k.title}`}))},{k:'start',label:'تاريخ البداية',type:'date'},{k:'end',label:'تاريخ النهاية',type:'date'},{k:'value',label:'قيمة العقد',type:'number'},{k:'payToAuthority',label:'ما ندفعه للهيئة الملكية عن هذه الاتفاقية',type:'number'},{k:'investment',label:'التكلفة الاستثمارية الأولية (لحساب فترة الاسترداد)',type:'number'},{k:'payFromInvestor',label:'ما يدفعه المستثمر لنا',type:'number'},{k:'period',label:'دورية السداد',type:'select',options:['سنوي','نصف سنوي','ربع سنوي','شهري','دفعة واحدة']},{k:'scope',label:'نطاق العمل (مسؤولية المستثمر أو مسؤوليتنا في التشغيل الذاتي)',type:'textarea',full:true},{k:'status',label:'الحالة',type:'select',options:['ساري','منتهي','قيد التجديد','ملغي'],default:'ساري'},{k:'renewal',label:'التجديد',type:'select',options:['تلقائي','قابل للتجديد','يحتاج قرار','غير قابل']},{k:'obligations',label:'الالتزامات',type:'textarea',full:true},{k:'notes',label:'ملاحظات',type:'textarea',full:true}]}; if(where) c.where=where; if(defType==='تشغيل ذاتي'||defType==='مستثمر') c.onChange=()=>{ const y=scrollY; App.render(); requestAnimationFrame(()=>scrollTo(0,y)); }; c.onSave=o=>{ if(o.contractorId&&!o.party) Store.update('contracts',o.id,{party:Store.get('contractors',o.contractorId)?.name||''}); if(!o.parentId){ const k=agreementFor(o.assetId); if(k&&k.id!==o.id&&!OP_TYPES.includes(o.type)) Store.update('contracts',o.id,{parentId:k.id}); } }; if(defType){ const f=c.fields.find(x=>x.k==='type'); f.default=defType; c.title={'مستثمر':'عقد مستثمر','تشغيل ذاتي':'اتفاقية تشغيل ذاتي','تشغيل وصيانة':'عقد تشغيل وصيانة'}[defType]||'عقد'; } return c; }
 M.contracts={key:'contracts',label:'العقود',icon:'📜',group:'الأساسي',render(v){
   const K=Store.coll('contracts');
   v.innerHTML=`<div class="grid g4 mb">
@@ -1375,6 +1375,92 @@ M.whatif={key:'whatif',label:'دراسة الفرص',icon:'🔍',group:'الرئ
   Charts.make('wiC','line',yl,['team','inv'].filter(o=>o!=='inv'||val.qOffer).map(o=>({label:WI_OPTS[o].l,data:[Math.round(R[o].cum[0]),...R[o].rows.map(r=>Math.round(r.cum))],color:WI_OPTS[o].c,fill:false,borderWidth:o===D.best?3.5:2})));
 }};
 
+/* ───── معالج إضافة مشروع جديد: سؤال بسؤال، ثم يُنشئ المشروع والمباني والوحدات والاتفاقية دفعة واحدة ───── */
+const NPView={step:0,a:{}};
+const NP_KIND={'سكني - فلل':{l:'سكني - فلل'},'سكني - شقق':{l:'سكني - شقق'},'تجاري':{l:'تجاري'},'مختلط':{l:'مختلط'}};
+const NP_MODEL={self:{l:'🏠 تشغيل ذاتي'},inv:{l:'🤝 إسناد لمستثمر'},help:{l:'لا أعرف، ساعدني أقرر'}};
+const NP_STEPS=[
+  {id:'name',t:'text',s:'اسم المشروع',l:'ما اسم المشروع؟',req:1,w:['يظهر في كل الشاشات والتقارير ويُبنى منه رمز المشروع.','يصبح المشروع الأصل الأعلى، وتتبعه المباني والوحدات والاتفاقية.','اسم قصير واضح، مثل «فلل العزيزية».']},
+  {id:'city',t:'text',s:'الموقع',l:'أين يقع المشروع؟',hint:'المدينة أو الحي',w:['لتمييز المشاريع وتصفيتها حسب الموقع.','يُحفظ في بيانات الأصل ويظهر في سجل الأصول والخرائط.','اكتب المدينة والحي، مثل «ينبع الصناعية · العزيزية».']},
+  {id:'kind',t:'opts',s:'نوع المشروع',l:'ما نوع المشروع؟',opts:NP_KIND,def:'سكني - فلل',w:['النوع يحدد طبيعة الوحدات وطريقة متابعتها.','يُحفظ نوعاً للمشروع ولكل وحداته.','المختلط: سكني مع محلات أو مكاتب.']},
+  {id:'bld',t:'num',s:'المباني',l:'كم مبنى في المشروع؟',u:'مبنى',min:0,max:200,def:0,hint:'صفر إذا كانت الوحدات فللاً مستقلة بلا مبانٍ',w:['لترتيب الوحدات تحت مبانيها، فتتابع حالة كل مبنى وإشغاله.','تُنشأ المباني تلقائياً وتوزَّع الوحدات عليها بالتساوي، وتقدر تعدّل التوزيع لاحقاً.','للفلل اكتب صفراً، فتتبع الوحدات المشروع مباشرة.']},
+  {id:'units',t:'num',s:'الوحدات',l:'كم وحدة قابلة للتأجير؟',u:'وحدة',min:1,max:5000,req:1,w:['تُنشأ الوحدات تلقائياً بدل إدخالها وحدة وحدة.','كل وحدة تُسجَّل شاغرة بالإيجار الذي تحدده في السؤال التالي، وتعدّل كل وحدة لاحقاً من سجل الأصول.','احسب الوحدات الجاهزة للتأجير فقط.']},
+  {id:'rent',t:'num',s:'الإيجار السنوي',l:'كم متوسط الإيجار السنوي للوحدة؟',u:'ر.س',min:0,w:['يُسجَّل إيجاراً مبدئياً لكل وحدة، ومنه يُحسب دخل المشروع المتوقع.','الدخل الكامل = الوحدات × الإيجار، ويظهر في لوحة التحكم وسعر التعادل.','استخدم إيجار السوق لوحدات مشابهة.']},
+  {id:'auth',t:'num',s:'المسدد للهيئة الملكية',l:'كم تدفع للهيئة الملكية سنوياً عن هذا المشروع؟',u:'ر.س',min:0,w:['هو أكبر التزام ثابت على المشروع.','يُسجَّل في الاتفاقية «ما ندفعه للهيئة الملكية»، فتُحسب منه صحة الاتفاقية وسعر التعادل والتدفقات.','إن كان يزيد دورياً، ضع المبلغ الحالي وعدّله عند الزيادة.']},
+  {id:'start',t:'date',s:'بداية الاتفاقية',l:'متى تبدأ الاتفاقية؟',w:['لحساب مدة الاتفاقية ومواعيد الاستحقاق والتنبيهات.','تُحسب منها نهاية الاتفاقية حسب المدة في السؤال التالي.','إن لم يُحدد بعد، ضع التاريخ المتوقع.']},
+  {id:'years',t:'num',s:'مدة الاتفاقية',l:'كم سنة مدة الاتفاقية؟',u:'سنة',min:1,max:50,def:10,w:['المدة تحدد الأفق الذي يُسترد فيه الاستثمار.','تاريخ النهاية = البداية + المدة، ويُنبهك النظام قبل الانتهاء.','اكتب المدة المتبقية فعلاً إن كانت الاتفاقية قائمة.']},
+  {id:'inv',t:'num',s:'التكلفة الاستثمارية',l:'كم التكلفة الاستثمارية الأولية للمشروع؟',u:'ر.س',min:0,def:0,hint:'تجهيز وتشطيب وأثاث، صفر إن لم توجد',w:['لحساب فترة استرداد ما صرفته.','تُسجَّل في الاتفاقية «التكلفة الاستثمارية»، وتظهر في صفحة التدفقات والاسترداد.','ضع ما صُرف أو سيُصرف قبل التشغيل.']},
+  {id:'model',t:'opts',s:'نموذج التشغيل',l:'كيف ستشغّل المشروع؟',opts:NP_MODEL,def:'help',w:['النموذج يحدد من يؤجر ويحصّل ويصون: أنت أو المستثمر.','يحدد نوع الاتفاقية التي تُنشأ، وأين يظهر المشروع: صفحة التشغيل الذاتي أو صفحة الإسناد لمستثمر.','إن لم تكن متأكداً اختر «ساعدني»، ونحسب لك التوصية بنفس أرقامك قبل الإنشاء.']},
+  {id:'investor',t:'text',s:'المستثمر',l:'ما اسم المستثمر؟',when:a=>a.model==='inv',req:1,w:['يُسجَّل طرفاً في عقد الإسناد.','يظهر في صفحة الإسناد لمستثمر ومتابعة الدفعات.','اكتب الاسم التجاري كما في العقد.']},
+  {id:'offer',t:'num',s:'دفعة المستثمر السنوية',l:'كم يدفع المستثمر سنوياً؟',u:'ر.س',min:0,when:a=>a.model!=='self',hintF:a=>a.model==='help'?'إن وصلك عرض؛ صفر إن لم يصل':'',w:['هذا دخلك المضمون في الإسناد.','يُسجَّل «ما يدفعه المستثمر لنا»، والفرق بينه وبين مبلغ الهيئة ربحك.','قارن العروض على نفس الشروط: الزيادة الدورية وفترة السماح.']},
+  {id:'review',t:'review',l:'راجع وأنشئ المشروع'}
+];
+const npSteps=a=>NP_STEPS.filter(s=>!s.when||s.when(a));
+const npVal=(a,s)=>a[s.id]??(s.id==='start'?todayStr():s.def??(s.t==='num'?0:''));
+/* التوصية لمن اختار «ساعدني»: نفس محرك دراسة الفرص بأرقام المشروع */
+function npAdvise(a){ const S=wiSys(), v={}; const over={qUnits:a.units||0,qRent:a.rent||0,auth:a.auth||0,qH:Math.min(30,a.years||10),qOffer:a.offer||0,qReady:a.inv?'no':'yes',setup:a.inv||0};
+  WI_FD.forEach(f=>{ v[f.id]=over[f.id]!=null?over[f.id]:f.def(v,S); }); const D=wiDecide(v); return {D,A:wiAdvice(D,S)}; }
+function npCreate(a,model){ const all=Store.coll('assets'), yr=new Date().getFullYear(), n=all.filter(x=>x.level==='project').length+1;
+  let code='PRJ-'+String(n).padStart(2,'0'); for(let i=n;all.some(x=>x.code===code);i++) code='PRJ-'+String(i+1).padStart(2,'0');
+  const self=model==='self', base={createdAt:now(),createdBy:App.user.id}, ids=new Set(all.map(x=>x.id)), gid=()=>{ let id; do{ id='A-'+String(1000+Math.floor(Math.random()*90000)).padStart(5,'0'); }while(ids.has(id)); ids.add(id); return id; };
+  const P={id:gid(),code,name:a.name,level:'project',parentId:null,type:a.kind,location:a.city||'',ownership:'مخصص',value:0,condition:'جيد',status:a.inv?'تحت الإنشاء':'قيد التشغيل',operatingModel:self?'self':'investor',...base};
+  const B=[...Array(Math.max(0,Math.round(a.bld||0)))].map((_,i)=>({id:gid(),code:`${code}-B${String(i+1).padStart(2,'0')}`,name:`مبنى ${i+1}`,level:'building',parentId:P.id,type:a.kind,location:a.city||'',condition:'جيد',status:'قيد التشغيل',...base}));
+  const U=[...Array(Math.round(a.units))].map((_,i)=>({id:gid(),code:`${code}-U${String(i+1).padStart(3,'0')}`,name:`وحدة ${i+1}`,level:'unit',parentId:B.length?B[i%B.length].id:P.id,type:a.kind,location:a.city||'',condition:'جيد',status:'شاغر',occupancy:'شاغر',rent:Number(a.rent)||0,...base}));
+  Store.data.assets=[P,...B,...U,...all];
+  const alloc=Store.coll('contracts').find(k=>k.type==='تخصيص'), start=a.start||todayStr(), end=(()=>{ const d=new Date(start); d.setFullYear(d.getFullYear()+Math.round(a.years||10)); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); })();
+  const pre=self?'SELF':'INV', cnt=Store.coll('contracts').filter(k=>String(k.number||'').startsWith(`${pre}-${yr}`)).length+1;
+  const K=Store.add('contracts',{number:`${pre}-${yr}-${String(cnt).padStart(2,'0')}`,type:self?'تشغيل ذاتي':'مستثمر',title:self?`اتفاقية تشغيل ذاتي لـ${a.name}`:`عقد تشغيل ${a.name} مع مستثمر`,party:self?'الهيئة الملكية':(a.investor||'مستثمر'),assetId:P.id,parentId:alloc?.id||'',start,end,value:Math.round((self?(a.auth||0):(a.offer||0))*Math.round(a.years||10)),payToAuthority:Number(a.auth)||0,payFromInvestor:self?0:(Number(a.offer)||0),investment:Number(a.inv)||0,period:'سنوي',scope:self?`نحن المسؤولون: تأجير ${U.length} وحدة وتحصيلها وصيانتها`:'التشغيل الكامل: التأجير والتحصيل والصيانة وإدارة المرافق',status:'ساري',renewal:'يحتاج قرار'});
+  Store.log('إضافة','assets',P.id,`إنشاء مشروع ${a.name}: ${B.length} مبنى و${U.length} وحدة واتفاقية ${K.number}`); Store.save();
+  return {P,B,U,K}; }
+M.newproject={key:'newproject',label:'إضافة مشروع',icon:'➕',group:'الرئيسية',render(v){
+  const st=NPView, a=st.a, steps=npSteps(a), i=Math.max(0,Math.min(steps.length-1,st.step)), s=steps[i], cur=npVal(a,s);
+  const full=(a.units||0)*(a.rent||0);
+  const live=`<div class="wzlive"><div class="small muted">ملخص ما أدخلته</div>
+    ${a.name?`<div><span>المشروع</span><b>${esc(a.name)}</b></div>`:''}<div><span>الوحدات</span><b>${a.units||'—'}${a.bld?` في ${a.bld} مبنى`:''}</b></div>
+    <div><span>الدخل الكامل سنوياً</span><b>${short(full)}</b></div><div><span>المسدد للهيئة الملكية</span><b class="neg">${a.auth?'-'+short(a.auth):'0'}</b></div>
+    <div class="tot"><span>المتبقي قبل التكاليف</span><b class="${full-(a.auth||0)<0?'neg':''}">${short(full-(a.auth||0))}</b></div></div>`;
+  const side=s.w?`<aside class="card wzside"><h4>لماذا نسأل؟</h4><p>${esc(s.w[0])}</p><h4>ماذا يحدث به</h4><p>${esc(s.w[1])}</p>${s.w[2]?`<h4>نصيحة</h4><p>${esc(s.w[2])}</p>`:''}${live}</aside>`:`<aside class="card wzside"><h4>ماذا سيُنشأ</h4><p>عند الضغط على «إنشاء المشروع» تُضاف هذه السجلات مرة واحدة، وكلها قابلة للتعديل لاحقاً من صفحاتها.</p>${live}</aside>`;
+  const prog=`<div class="wzp"><span>${s.t==='review'?'المراجعة':`السؤال ${i+1} من ${steps.length-1}`}</span><div class="bar gold"><i style="width:${Math.round((i+1)/steps.length*100)}%"></i></div></div>
+    <div class="wzdots">${steps.map((q,j)=>`<button type="button" class="${j===i?'on':''} ${a[q.id]!=null?'ok':''}" data-j="${j}" title="${esc(q.s||q.l)}" aria-label="${esc(q.s||q.l)}"></button>`).join('')}</div>`;
+  let body='';
+  if(s.t==='opts') body=`<div class="wzo">${Object.entries(s.opts).map(([k,o])=>`<button type="button" class="wzb ${cur===k?'on':''}" data-a="${k}">${o.l}</button>`).join('')}</div>`;
+  else if(s.t==='review'){
+    const help=a.model==='help', R=help?npAdvise(a):null, pick=help?(a.pick||(R.D.best==='inv'?'inv':'self')):a.model;
+    const row=(l,x)=>`<div class="nprow"><span>${l}</span><b>${x}</b></div>`;
+    body=`${help?`<div class="card rec ${R.A.tone} np-rec"><h3>${WI_OPTS[R.D.best].ic} ${esc(R.A.title)}</h3><ul class="why">${R.A.why.slice(0,3).map(w=>`<li>${esc(w)}</li>`).join('')}</ul>
+        <div class="small muted" style="margin:10px 0 6px">اختر النموذج الذي تُنشأ به الاتفاقية:</div><div class="wzo">${['self','inv'].map(m=>`<button type="button" class="wzb ${pick===m?'on':''}" data-pick="${m}">${m==='self'?'🏠 تشغيل ذاتي':'🤝 إسناد لمستثمر'}${(R.D.best==='inv')===(m==='inv')?' · موصى به':''}</button>`).join('')}</div>
+        ${pick==='inv'?`<div class="f" style="margin-top:10px"><label>اسم المستثمر</label><input id="npInvName" value="${esc(a.investor||'')}" placeholder="اكتب اسم المستثمر"></div>`:''}
+        <div class="small" style="margin-top:8px"><a href="#whatif" id="npStudy">افتح الدراسة الكاملة بهذه الأرقام</a></div></div>`:''}
+      <div class="nplist">${row('المشروع',esc(a.name||'—'))}${row('الموقع',esc(a.city||'—'))}${row('النوع',esc(a.kind||NP_KIND['سكني - فلل'].l))}
+      ${row('المباني',a.bld?`${a.bld} مبنى`:'بدون مبانٍ (الوحدات تتبع المشروع)')}${row('الوحدات',`${a.units||0} وحدة بإيجار ${num(a.rent||0)} ر.س`)}
+      ${row('المسدد للهيئة الملكية',`${num(a.auth||0)} ر.س سنوياً`)}${row('الاتفاقية',`${npVal(a,{id:'start'})} لمدة ${a.years||10} سنوات`)}${row('التكلفة الاستثمارية',`${num(a.inv||0)} ر.س`)}
+      ${row('نموذج التشغيل',pick==='self'?'🏠 تشغيل ذاتي':`🤝 إسناد لمستثمر${a.investor?' · '+esc(a.investor):''}${a.offer?` · ${num(a.offer)} ر.س سنوياً`:''}`)}</div>
+      <p class="small muted">سيُنشأ: مشروع واحد${a.bld?`، و${a.bld} مبنى`:''}، و${a.units||0} وحدة شاغرة، و${pick==='self'?'اتفاقية تشغيل ذاتي':'عقد إسناد لمستثمر'} مرتبطة بالمشروع.</p>`;
+    st.pickNow=pick;
+  } else body=`<div class="wzn"><input id="wzI" type="${s.t==='num'?'number':s.t==='date'?'date':'text'}" ${s.t==='num'?'inputmode="decimal"':''} ${s.min!=null?`min="${s.min}"`:''} ${s.max!=null?`max="${s.max}"`:''} value="${esc(String(cur))}">${s.u?`<span>${s.u}</span>`:''}</div>`;
+  const hint=s.hintF?s.hintF(a):s.hint;
+  v.innerHTML=`<div class="toolbar"><span class="muted">أضف مشروعاً جديداً بخطوات بسيطة، ويُنشأ المشروع ووحداته واتفاقيته تلقائياً.</span><span class="sp"></span><button class="btn sm" id="npClear">↺ ابدأ من جديد</button></div>
+  <div class="wizw"><div class="card wiz">${prog}<h2 class="wzq">${esc(s.l)}</h2>${hint?`<p class="muted wzh">${esc(hint)}</p>`:''}${body}
+    <div class="wzf"><button class="btn" id="wzBack" ${i?'':'disabled'}>السابق</button><span class="sp"></span><button class="btn p" id="wzNext">${s.t==='review'?'إنشاء المشروع':i===steps.length-2?'المراجعة':'التالي'}</button></div></div>${side}</div>`;
+  const go=j=>{ st.step=Math.max(0,j); M.newproject.render(v); window.scrollTo({top:0,behavior:'smooth'}); };
+  const inp=$('#wzI',v);
+  const read=()=>{ if(!inp) return true; let x=inp.value; if(s.t==='num'){ x=Number(x); if(!isFinite(x)) x=0; if(s.min!=null) x=Math.max(s.min,x); if(s.max!=null) x=Math.min(s.max,x); } else x=String(x).trim();
+    if(s.req&&!(s.t==='num'?x>0:x)){ toast('هذا السؤال مطلوب'); inp.focus(); return false; } a[s.id]=x; return true; };
+  if(inp){ inp.focus(); if(inp.select) inp.select(); inp.onkeydown=e=>{ if(e.key==='Enter'&&read()) go(i+1); }; }
+  v.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{ a[s.id]=b.dataset.a; if(s.id==='model') delete a.pick; v.querySelectorAll('[data-a]').forEach(x=>x.classList.remove('on')); b.classList.add('on'); setTimeout(()=>go(i+1),180); });
+  v.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{ const n=$('#npInvName',v); if(n) a.investor=n.value.trim(); a.pick=b.dataset.pick; M.newproject.render(v); });
+  v.querySelectorAll('[data-j]').forEach(b=>b.onclick=()=>{ if(read()) go(Number(b.dataset.j)); });
+  $('#wzBack',v).onclick=()=>{ read(); go(i-1); };
+  $('#npClear',v).onclick=()=>{ st.a={}; st.step=0; M.newproject.render(v); };
+  const sl=$('#npStudy',v); if(sl) sl.onclick=()=>{ const all=Store.data.wiStudies||(Store.data.wiStudies={}); const vals={qUnits:a.units,qRent:a.rent,auth:a.auth,qH:Math.min(30,a.years||10),qOffer:a.offer||0}; all[WI_KEY]={v:vals,t:Object.fromEntries(Object.keys(vals).map(k=>[k,1])),done:1}; Store.save(); WIView.step=null; };
+  $('#wzNext',v).onclick=()=>{
+    if(s.t!=='review'){ if(s.t!=='opts'&&!read()) return; if(s.t==='opts'&&a[s.id]==null) a[s.id]=cur; go(i+1); return; }
+    const n=$('#npInvName',v); if(n) a.investor=n.value.trim();
+    const model=st.pickNow; if(!a.name||!(a.units>0)) return toast('أكمل اسم المشروع وعدد الوحدات');
+    const r=npCreate(a,model); st.a={}; st.step=0; App.refreshBadges();
+    toast(`تم إنشاء ${r.P.name}: ${r.U.length} وحدة واتفاقية ${r.K.number}`); location.hash=model==='self'?'#operations':'#investor'; };
+}};
+
 const CFView={scope:'all'};
 M.cashflow={key:'cashflow',label:'التدفقات النقدية والاسترداد',icon:'💵',group:'الرئيسية',render(v){
   const st=CFView, cur=curMo(), months=[]; for(let i=-11;i<=12;i++) months.push(addMo(cur,i)); const nA=12;
@@ -1429,7 +1515,7 @@ M.system={key:'system',label:'الإعدادات والنسخ',icon:'⚙️',gro
 }};
 
 /* ───────────────────────── App / Router ───────────────────────── */
-const NAV_ORDER=['dashboard','cashflow','whatif','agreements','alerts','operations','investor','assets','documents','contracts','finance','users','reports','gis','system'];
+const NAV_ORDER=['dashboard','newproject','cashflow','whatif','agreements','alerts','operations','investor','assets','documents','contracts','finance','users','reports','gis','system'];
 const App={
   user:null,
   init(){
