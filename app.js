@@ -285,10 +285,11 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
   const share=x=>PM.profit>0?`يساهم بـ${per(x,PM.profit)}% من ربح المحفظة`:'';
   const occP=pct(PM.occ,PM.units), big=(l,val,cls,word,note)=>`<div class="dk"><div class="l">${l}</div><div class="v">${val}</div><span class="pill ${cls}">${word}</span><div class="s">${note}</div></div>`;
   /* كل خانة تُقسم حسب مصدرها: التشغيل الذاتي والإسناد لمستثمر */
+  const seg=(l,p)=>p>=38?`${l} ${p}%`:p>=14?`${p}%`:'';
   const eq=(l,val,dot,cls,a,b)=>{ const pos=a>=0&&b>=0&&a+b>0, pa=pos?Math.round(a/(a+b)*100):0;
     return `<div class="de ${cls||''}"><span>${dot?`<i class="${dot}"></i>`:''}${l}</span><b>${val}</b>
-      ${pos?`<div class="dsp" role="img" aria-label="تشغيل ذاتي ${pa}%، إسناد لمستثمر ${100-pa}%"><i class="s" style="width:${pa}%"></i><i class="n" style="width:${100-pa}%"></i></div>`:''}
-      <div class="dsl"><div><u class="s"></u>تشغيل ذاتي <b>${short(a)}</b>${pos?` <small>${pa}%</small>`:''}</div><div><u class="n"></u>إسناد لمستثمر <b>${short(b)}</b>${pos?` <small>${100-pa}%</small>`:''}</div></div></div>`; };
+      ${pos?`<div class="dsp" role="img" aria-label="تشغيل ذاتي ${pa}%، إسناد لمستثمر ${100-pa}%">${pa?`<i class="s" style="width:${pa}%">${seg('تشغيل ذاتي',pa)}</i>`:''}${pa<100?`<i class="n" style="width:${100-pa}%">${seg('إسناد لمستثمر',100-pa)}</i>`:''}</div>`:''}
+      <div class="dsl"><div><u class="s"></u>تشغيل ذاتي <b>${short(a)}</b></div><div><u class="n"></u>إسناد لمستثمر <b>${short(b)}</b></div></div></div>`; };
   v.innerHTML=`
   <div class="dtier">الأساسي</div>
   <section class="dhero mb">
