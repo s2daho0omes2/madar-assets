@@ -1045,22 +1045,40 @@ M.reports={key:'reports',label:'التقارير والتحليلات',icon:'�
 }};
 
 /* 11. الخرائط GIS */
-M.gis={key:'gis',label:'الخرائط GIS',icon:'🗺️',group:'متقدم',render(v){
-  const maps=Store.coll('maps'); let curMap=maps[0]?.id||null; let placing=null;
-  const draw=()=>{ const mp=Store.get('maps',curMap); const pins=Store.coll('assets').filter(a=>a.x!=null&&a.y!=null&&(!mp||!a.mapId||a.mapId===mp.id));
-    v.innerHTML=`<div class="toolbar"><select id="mapSel">${maps.map(m=>`<option value="${m.id}" ${m.id===curMap?'selected':''}>${esc(m.name)}</option>`).join('')}${maps.length?'':'<option>لا توجد خرائط</option>'}</select>
-      ${can('edit')?`<label class="btn">📤 رفع خريطة/مخطط<input type="file" accept="image/*" id="mapUp" class="hidden"></label>`:''}
-      <select id="placeSel"><option value="">— اختر أصلاً لتحديد موقعه —</option>${Store.coll('assets').filter(a=>a.level!=='equipment').map(a=>`<option value="${a.id}">${LEVELS[a.level]}: ${esc(a.name)}</option>`).join('')}</select>
-      <span class="small muted" id="hint">${placing?'انقر على الخريطة لتثبيت الموقع':'اختر أصلاً ثم انقر على الخريطة'}</span><span class="sp"></span>${mp&&can('delete')?`<button class="btn d sm" id="mapDel">حذف الخريطة</button>`:''}</div>
-      <div class="card" style="padding:8px"><div class="map" id="map">${mp?`<img src="${mp.src}" alt="">`:`<div class="ph"><div><div style="font-size:40px">🗺️</div>ارفع المخطط العام للمشروع أو مخطط الحي (صورة)، ثم ثبّت مواقع الأصول عليه.<br><span class="small">عند توفر إحداثيات GPS نربطها بخريطة تفاعلية لاحقاً.</span></div></div>`}
-      ${mp?pins.map(a=>`<div class="pin" style="left:${a.x}%;top:${a.y}%" data-id="${a.id}" title="${esc(a.name)}">${{project:'🏙️',district:'🏘️',building:'🏢',unit:'🏠'}[a.level]||'📍'}<span>${esc(a.name)} · ${esc(a.condition)}</span></div>`).join(''):''}</div></div>
-      <div class="card" style="margin-top:14px"><h3>الأصول المربوطة بالموقع (${pins.length})</h3><table class="tbl"><thead><tr><th>الأصل</th><th>المستوى</th><th>الموقع</th><th>س%</th><th>ص%</th><th>الحالة</th></tr></thead><tbody>${pins.map(a=>`<tr class="clk" data-id="${a.id}"><td>${esc(a.name)}</td><td>${LEVELS[a.level]}</td><td>${esc(a.location||'')}</td><td class="num">${a.x}</td><td class="num">${a.y}</td><td>${pill(a.condition)}</td></tr>`).join('')}</tbody></table></div>`;
-    $('#mapSel',v).onchange=e=>{ curMap=e.target.value; draw(); };
+/* الخريطة: خريطة ينبع الصناعية مدمجة. انقر أي نقطة لربطها بمشروع موجود، وانقر الدبوس لعرض المشروع أو نقله */
+const GIS_BASE={id:'MAP-YANBU',name:'ينبع الصناعية',src:'assets/yanbu-map.webp',builtin:true};
+const healthBadgeOf=a=>{ const k=agreementFor(a.id); return k&&k.assetId===a.id?healthBadge(k):''; };
+M.gis={key:'gis',label:'الخريطة',icon:'🗺️',group:'متقدم',render(v){
+  let curMap=GIS_BASE.id, moving=null;
+  const tone=a=>{ const t=agreementFor(a.id)?.type; return t==='تشغيل ذاتي'?'self':t==='مستثمر'?'inv':'none'; };
+  const draw=()=>{ const maps=[GIS_BASE,...Store.coll('maps')], mp=maps.find(m=>m.id===curMap)||GIS_BASE;
+    const pins=Store.coll('assets').filter(a=>a.x!=null&&a.y!=null&&a.mapId===mp.id), mv=moving&&Store.get('assets',moving);
+    v.innerHTML=`<div class="toolbar"><select id="mapSel" style="width:auto">${maps.map(m=>`<option value="${m.id}" ${m.id===mp.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select>
+      <span class="wlead" style="font-size:16px">${mv?`انقر على الخريطة لتحديد الموقع الجديد لـ«${esc(mv.name)}»`:'انقر أي نقطة على الخريطة لربطها بمشروع.'}</span>${mv?'<button class="btn sm" id="mvX">إلغاء النقل</button>':''}<span class="sp"></span>
+      ${can('edit')?`<label class="btn sm">📤 رفع خريطة أخرى<input type="file" accept="image/*" id="mapUp" class="hidden"></label>`:''}${!mp.builtin&&can('delete')?`<button class="btn d sm" id="mapDel">حذف الخريطة</button>`:''}</div>
+      <div class="card" style="padding:8px"><div class="gmap ${can('edit')?'edit':''}" id="map"><img src="${mp.src}" alt="خريطة ${esc(mp.name)}" draggable="false">
+        ${pins.map(a=>`<button type="button" class="gpin ${tone(a)} ${a.id===moving?'mv':''}" style="left:${a.x}%;top:${a.y}%" data-id="${a.id}" aria-label="${esc(a.name)}"><i></i><span>${esc(a.name)}</span></button>`).join('')}</div>
+        <div class="gleg"><span><i class="self"></i>تشغيل ذاتي</span><span><i class="inv"></i>إسناد لمستثمر</span><span><i class="none"></i>بلا اتفاقية</span><span class="sp"></span><span class="muted">${pins.length} موقع مربوط</span></div></div>
+      <div class="card" style="margin-top:14px"><h3>المواقع المربوطة (${pins.length})</h3>${pins.length?`<div class="twrap"><table class="tbl"><thead><tr><th>الأصل</th><th>المستوى</th><th>نموذج التشغيل</th><th>الربح السنوي</th><th></th></tr></thead><tbody>${pins.map(a=>{ const k=agreementFor(a.id); return `<tr class="clk" data-id="${a.id}"><td><b>${esc(a.name)}</b><div class="small muted">${esc(a.location||'')}</div></td><td>${LEVELS[a.level]}</td><td>${k?pill(AG_LABEL[k.type]):'—'}</td><td>${k&&k.assetId===a.id?num(agreementPL(k).profit):'—'}</td><td>${healthBadgeOf(a)}</td></tr>`; }).join('')}</tbody></table></div>`:'<div class="empty">لا توجد مواقع بعد. انقر على مكان المشروع في الخريطة واختره من القائمة.</div>'}</div>`;
+    $('#mapSel',v).onchange=e=>{ curMap=e.target.value; moving=null; draw(); };
+    if($('#mvX',v)) $('#mvX',v).onclick=()=>{ moving=null; draw(); };
     const up=$('#mapUp',v); if(up) up.onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ const m={id:'MAP-'+Date.now(),name:f.name.replace(/\.[^.]+$/,''),src:r.result}; Store.coll('maps').push(m); Store.log('إضافة','maps',m.id,'رفع خريطة'); Store.save(); curMap=m.id; draw(); toast('تم رفع الخريطة'); }; r.readAsDataURL(f); };
-    $('#placeSel',v).onchange=e=>{ placing=e.target.value||null; $('#hint',v).textContent=placing?'انقر على الخريطة لتثبيت الموقع':'اختر أصلاً ثم انقر على الخريطة'; };
-    const md=$('#mapDel',v); if(md) md.onclick=()=>{ ask('حذف الخريطة؟',()=>{ const i=maps.findIndex(m=>m.id===curMap); maps.splice(i,1); Store.save(); curMap=maps[0]?.id||null; draw(); },'حذف'); };
-    $('#map',v).onclick=e=>{ if(!placing||!mp||!can('edit')) return; const r=$('#map',v).getBoundingClientRect(); const x=+((e.clientX-r.left)/r.width*100).toFixed(1), y=+((e.clientY-r.top)/r.height*100).toFixed(1); Store.update('assets',placing,{x,y,mapId:mp.id}); toast('تم تثبيت الموقع'); draw(); };
-    v.querySelectorAll('.pin,[data-id].clk').forEach(p=>p.onclick=e=>{ if(placing&&p.classList.contains('pin')) return; e.stopPropagation(); assetDetail(Store.get('assets',p.dataset.id)); });
+    const md=$('#mapDel',v); if(md) md.onclick=()=>ask('حذف الخريطة ونقاطها؟',()=>{ const L=Store.coll('maps'), i=L.findIndex(m=>m.id===curMap); if(i>=0) L.splice(i,1); Store.coll('assets').forEach(a=>{ if(a.mapId===curMap){ a.x=null; a.y=null; a.mapId=''; } }); Store.save(); curMap=GIS_BASE.id; draw(); },'حذف');
+    const place=(id,x,y)=>{ Store.update('assets',id,{x,y,mapId:mp.id}); moving=null; draw(); toast('تم ربط الموقع'); };
+    $('#map',v).onclick=e=>{ if(e.target.closest('.gpin')||!can('edit')) return; const r=$('#map',v).getBoundingClientRect(), x=+((e.clientX-r.left)/r.width*100).toFixed(2), y=+((e.clientY-r.top)/r.height*100).toFixed(2);
+      if(moving) return place(moving,x,y);
+      const old=$('#map .gtmp',v); if(old) old.remove(); const t=document.createElement('div'); t.className='gtmp'; t.style.left=x+'%'; t.style.top=y+'%'; $('#map',v).appendChild(t);
+      const A=Store.coll('assets').filter(a=>a.level!=='equipment'&&a.level!=='unit'), grp=l=>A.filter(a=>a.level===l).map(a=>`<option value="${a.id}">${esc(a.name)}${a.x!=null&&a.mapId===mp.id?' (مربوط، سيُنقل)':''}</option>`).join('');
+      Modal.open({title:'ربط النقطة بمشروع',body:`<div class="form"><div class="f full"><label>اختر المشروع أو الأصل الموجود في هذا الموقع</label><select id="gSel"><option value="">— اختر —</option>${['project','district','building'].map(l=>grp(l)?`<optgroup label="${LEVELS[l]}">${grp(l)}</optgroup>`:'').join('')}</select></div></div><p class="small muted" style="margin-top:8px">المشروع غير موجود؟ أضفه أولاً من صفحة التشغيل الذاتي أو الإسناد لمستثمر، ثم ارجع واربطه.</p>`,footer:`<button class="btn" onclick="Modal.close()">إلغاء</button><button class="btn p" id="gOk">ربط</button>`});
+      $('#gOk').onclick=()=>{ const id=$('#gSel').value; if(!id) return toast('اختر مشروعاً'); Modal.close(); place(id,x,y); }; };
+    const openPin=id=>{ const a=Store.get('assets',id), k=agreementFor(id), p=k&&agreementPL(k);
+      Modal.open({title:esc(a.name),body:`<div class="nplist"><div class="nprow"><span>المستوى</span><b>${LEVELS[a.level]}</b></div><div class="nprow"><span>الموقع</span><b>${esc(a.location||'—')}</b></div><div class="nprow"><span>نموذج التشغيل</span><b>${k?AG_LABEL[k.type]:'بلا اتفاقية'}</b></div>${k?`<div class="nprow"><span>الاتفاقية</span><b>${esc(k.type==='مستثمر'?k.party:k.title)}</b></div><div class="nprow"><span>الربح السنوي للاتفاقية</span><b>${num(p.profit)} ر.س</b></div><div class="nprow"><span>ندفع للهيئة الملكية</span><b>${num(p.pay)} ر.س</b></div>`:''}</div>`,
+        footer:`${can('edit')?'<button class="btn d" id="gRm">إزالة من الخريطة</button><button class="btn" id="gMv">نقل النقطة</button>':''}<button class="btn p" id="gOpen">فتح ملف الأصل</button>`});
+      $('#gOpen').onclick=()=>{ Modal.close(); assetDetail(a); };
+      if($('#gMv')) $('#gMv').onclick=()=>{ Modal.close(); moving=id; draw(); };
+      if($('#gRm')) $('#gRm').onclick=()=>{ Modal.close(); Store.update('assets',id,{x:null,y:null,mapId:''}); draw(); toast('أُزيل من الخريطة'); }; };
+    v.querySelectorAll('.gpin').forEach(p=>p.onclick=e=>{ e.stopPropagation(); openPin(p.dataset.id); });
+    v.querySelectorAll('tr.clk[data-id]').forEach(r=>r.onclick=e=>{ if(e.target.closest('.hbadge')) return; openPin(r.dataset.id); });
   };
   draw();
 }};
