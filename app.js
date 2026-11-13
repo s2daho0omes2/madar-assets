@@ -601,11 +601,11 @@ function agCard(k){ const p0=agreementPL(k), p=p0.live?p0:Object.assign({},p0,p0
       ${inv?`<div><div class="l">يدفع لنا</div><b>${num(p.due)}</b></div><div><div class="l">المحصّل</div><b>${num(p.rev)}</b> <span class="small muted">${pct(p.rev,p.due)}%</span></div>`:`<div><div class="l">الدخل</div><b>${num(p.rev)}</b></div><div><div class="l">التكاليف</div><b>${num(p.exp)}</b></div>`}
       <div><div class="l">ندفع للهيئة</div><b>${k.payToAuthority===''||k.payToAuthority==null?'<span class="pill warn">غير محدد</span>':num(p.pay)}</b></div>
       <div><div class="l">ربحنا</div><b style="color:var(--green)">${num(p.profit)}</b> <span class="small muted">${p.margin}%</span></div>
-      <div><div class="l">الأصول / الوحدات</div><b>${o.assets} / ${o.units}</b></div>
+      <div><div class="l">المباني / الوحدات</div><b>${descendants(k.assetId).filter(a=>a.level==='building').length} / ${o.units}</b></div>
       ${inv?`<div><div class="l">التجديد</div><b>${esc(k.renewal||'—')}</b></div>`:`<div><div class="l">الإشغال</div><b>${o.units?o.occPct+'%':'—'}</b></div>`}
     </div>
     ${inv?'':(()=>{ const B=breakEven(k); return B.units.length?`<div class="small" style="margin-top:6px"><span class="muted">سعر التعادل للوحدة:</span> <b>${num(Math.round(B.beUnit))}</b> سنوياً (${num(Math.round(B.beUnit/12))} شهرياً)${B.authMissing?' <span class="pill warn">بدون مبلغ الهيئة</span>':''}</div>`:''; })()}
-    ${(()=>{ const pb=payback(k); return `<div class="small" style="margin-top:10px"><span class="muted">فترة الاسترداد:</span> ${paybackTxt(pb)}${pb.inv?` · استُرد ${pb.pctRec}% من ${short(pb.inv)}`:''}</div>`; })()}
+    ${(()=>{ const pb=payback(k); return `<div class="small" style="margin-top:10px"><span class="muted">فترة الاسترداد:</span> ${paybackTxt(pb,k)}${pb.inv?` · استُرد ${pb.pctRec}% من ${short(pb.inv)}`:''}</div>`; })()}
     ${span?`<div class="small muted" style="margin-top:10px">مدة العقد <span class="num">${k.start}</span> ← <span class="num">${k.end}</span> · مضى ${used}%</div><div class="bar ${d!=null&&d<=90?'red':'gold'}" style="margin-top:4px"><i style="width:${used}%"></i></div>`:''}
     ${inv?reqBlock(k):(()=>{ const st=meterStats(Store.coll('meters').filter(m=>meterAg(m)?.id===k.id)); return st.count?`<div class="small" style="margin-top:10px">⚡💧 <b>${st.count}</b> عداد · تكلفة 12 شهر ${num(st.cost12)} · ${st.unpaidN?`<span class="pill ${st.lateN?'bad':'warn'}">غير مسدد ${num(st.unpaidAmt)}</span>`:'<span class="pill ok">الفواتير مسددة</span>'}</div>`:''; })()}
     ${k.scope?`<div class="small" style="margin-top:10px"><span class="muted">نطاق العمل:</span> ${esc(k.scope)}</div>`:''}
@@ -1165,7 +1165,7 @@ function payback(k){ const p=agreementPL(k), inv=Number(k.investment)||0, annual
   let date=null; if(yrs!=null&&k.start){ const d=new Date(k.start); d.setDate(d.getDate()+Math.round(yrs*365.25)); date=d.toISOString().slice(0,10); }
   const term=k.start&&k.end?(new Date(k.end)-new Date(k.start))/31557600000:null;
   return {inv,annual,yrs,recovered,pctRec:inv?Math.round(recovered/inv*100):0,date,term,withinTerm:yrs!=null&&term!=null?yrs<=term:null}; }
-const paybackTxt=pb=>!pb.inv?'<span class="pill warn">أدخل التكلفة الاستثمارية</span>':pb.yrs==null?'<span class="pill bad">لا يُسترد بالأداء الحالي</span>':`<b>${pb.yrs.toFixed(1)} سنة</b>`;
+const paybackTxt=(pb,k)=>!pb.inv?(k&&k.type==='مستثمر'?'<span class="muted">لا ينطبق: لا استثمار علينا، والتطوير على المستثمر</span>':'<span class="pill warn">أدخل التكلفة الاستثمارية</span>'):pb.yrs==null?'<span class="pill bad">لا يُسترد بالأداء الحالي</span>':`<b>${pb.yrs.toFixed(1)} سنة</b>`;
 /* ───── مؤشر صحة الاتفاقية (0-100) ───── */
 const clamp=(x,lo=0,hi=100)=>Math.max(lo,Math.min(hi,x));
 function agreementHealth(k){
