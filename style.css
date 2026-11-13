@@ -340,3 +340,61 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .wzn input[type=text],.wzn input[type=date]{font-size:22px}
 
 .phx{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* ───── لوحة الرئيس التنفيذي ───── */
+.dhero{background:#16242f;color:#f1ede4;border-radius:18px;padding:clamp(18px,3vw,30px);display:flex;flex-direction:column;gap:22px;border:1px solid transparent}
+:root[data-theme="dark"] .dhero{background:#0c151c;border-color:#2a3743}
+.dh-top{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;align-items:flex-start}
+.dh-main{min-width:0;flex:1 1 380px}
+.dh-eye{font-size:12.5px;color:rgba(241,237,228,.62)}
+.dh-lbl{margin-top:14px;font-size:14px;color:rgba(241,237,228,.8)}
+.dh-big{font-size:clamp(44px,7vw,76px);font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.dh-big small{font-size:.3em;font-weight:500;color:rgba(241,237,228,.62)} .dh-big.neg{color:#f08a7c}
+.dh-say{margin:6px 0 0;font-size:16px;line-height:1.8;max-width:60ch;color:#f1ede4}
+.dh-side{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.dring{position:relative;width:104px;height:104px;flex:none}
+.dring>div{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.dring b{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums} .dring small{font-size:10.5px;color:rgba(241,237,228,.62);margin-top:3px}
+.dh-sl{font-size:14px;line-height:1.7} .dh-sl span{font-size:12.5px;color:rgba(241,237,228,.62)}
+.dh-al{color:#f1ede4;text-decoration:none;font-size:13px;font-weight:700;padding:7px 14px;border-radius:999px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);white-space:nowrap}
+.dh-al.bad{background:rgba(240,138,124,.16);border-color:rgba(240,138,124,.5);color:#ffc9c0} .dh-al:hover{background:rgba(255,255,255,.18)}
+.dh-flow{border-top:1px solid rgba(255,255,255,.12);padding-top:16px;display:flex;flex-direction:column;gap:10px}
+.dh-fh{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px;color:rgba(241,237,228,.8)} .dh-fh b{color:#f1ede4;font-variant-numeric:tabular-nums}
+.dflow{display:flex;height:14px;border-radius:8px;overflow:hidden;background:rgba(127,140,150,.22);gap:2px}
+.dflow i{display:block;height:100%} .dflow .c,.dleg i.c{background:#8fa3b3} .dflow .a,.dleg i.a{background:#b9925a} .dflow .p,.dleg i.p{background:#4fae82}
+.dhero .dflow{height:18px}
+.dleg{display:flex;gap:8px 26px;flex-wrap:wrap;font-size:13.5px;color:rgba(241,237,228,.85)}
+.dleg span{display:inline-flex;align-items:center;gap:7px} .dleg i{width:10px;height:10px;border-radius:3px;flex:none}
+.dleg b{color:#fff;font-variant-numeric:tabular-nums} .dleg em{font-style:normal;color:rgba(241,237,228,.6);font-variant-numeric:tabular-nums}
+.ddec h3{margin-bottom:6px}
+.drow{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:14px;padding:13px 4px;text-decoration:none;color:inherit;border-top:1px solid var(--line);transition:background .15s}
+.drow:first-of-type{border-top:0} .drow:hover{background:var(--sand)}
+.drow:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.dn{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:14px;background:var(--amber-bg);color:var(--amber);font-variant-numeric:tabular-nums}
+.drow.bad .dn{background:var(--red-bg);color:var(--red)}
+.dt b{font-size:15.5px} .dt .small{margin-top:2px;line-height:1.6}
+.damt{text-align:end;line-height:1.2} .damt b{display:block;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap} .damt small{font-size:11.5px;color:var(--muted)}
+.drow.bad .damt b{color:var(--red)}
+.dgo{color:var(--muted);font-size:18px}
+.dvit{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding:0}
+.dv{padding:18px 20px;display:flex;flex-direction:column;gap:8px;border-inline-start:1px solid var(--line)} .dv:first-child{border-inline-start:0}
+.dv .l{font-size:12.5px;color:var(--muted)} .dv .v{font-size:27px;font-weight:800;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:8px;flex-wrap:wrap;line-height:1.15}
+.dv .v .pill{font-size:11.5px} .dv .s{font-size:12px;color:var(--muted);line-height:1.6}
+.dmeter{position:relative;height:7px;border-radius:6px;background:var(--sand-2)}
+.dmeter i{display:block;height:100%;border-radius:6px;background:var(--ok)} .dmeter i.warn{background:var(--amber)} .dmeter i.bad{background:var(--red)}
+.dmeter u{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--text);opacity:.55;border-radius:2px}
+@media(max-width:1000px){.dvit{grid-template-columns:repeat(2,minmax(0,1fr))}.dv:nth-child(odd){border-inline-start:0}.dv:nth-child(n+3){border-top:1px solid var(--line)}}
+@media(max-width:560px){.dvit{grid-template-columns:1fr}.dv{border-inline-start:0}.dv+.dv{border-top:1px solid var(--line)}.drow{grid-template-columns:auto minmax(0,1fr) auto}.dgo{display:none}}
+.dmod{display:flex;flex-direction:column;gap:14px;text-decoration:none;color:inherit;border-top:5px solid var(--wood);transition:transform .15s,box-shadow .15s}
+.dmod.inv{border-top-color:var(--sky)} .dmod:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.08)}
+.dmod:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.dmh{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap} .dmh h3{margin:0}
+.dm3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.dm3 span{display:block;font-size:12px;color:var(--muted)} .dm3 b{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums} .dm3 b.neg,.dlg td.neg{color:var(--red)}
+.dchips{display:flex;flex-wrap:wrap;gap:8px}
+.dchips span{font-size:12.5px;padding:5px 10px;border-radius:999px;background:var(--sand-2);color:var(--muted)} .dchips b{color:var(--text)}
+.dchips span.bad{background:var(--red-bg);color:var(--red)} .dchips span.bad b{color:var(--red)} .dchips span.warn{background:var(--amber-bg);color:var(--amber)} .dchips span.warn b{color:var(--amber)}
+.dlg td{vertical-align:middle}
+@media (prefers-reduced-motion:reduce){.dmod,.drow{transition:none}.dmod:hover{transform:none}}
+
+.wlead{font-size:19px;font-weight:700;color:var(--text);line-height:1.6}

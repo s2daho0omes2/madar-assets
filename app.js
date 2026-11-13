@@ -239,110 +239,119 @@ function portfolioMetrics(all){
     return {mo,tenants:P.filter(p=>(p.dueDate||'').startsWith(mo)).reduce((s,p)=>s+Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0)),0),invIn:invNoi/12,auth:pay/12,om:omYear/12}; });
   return {noi,selfNoi,invNoi,pay,profit,value,yieldOn:value?noi/value*100:0,coverage:pay?noi/pay:0,units:units.length,occ:occ.length,pgi,occRent,vacancyLoss:pgi-occRent,vacant:vacant.length,unpriced,dueAmt,duePaid,collection:dueAmt?duePaid/dueAmt*100:100,aging,arrears,wale:wi?w/wi:0,expiry,conc,concTot:sum(conc,'v'),cf};
 }
+/* لوحة الرئيس التنفيذي: رقم واحد أولاً، ثم أين يذهب الدخل، ثم ما يحتاج قراراً، ثم المؤشرات والتفاصيل */
 M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'الرئيسية',render(v){
-  const A=Store.coll('assets'), F=Store.coll('finance');
-  const alerts=computeAlerts(); const byCond={}; A.forEach(a=>byCond[a.condition]=(byCond[a.condition]||0)+1);
-  const all=opAgreements().map(k=>({k,...agreementPL(k),...agreementOps(k)}));
+  const F=Store.coll('finance'), alerts=computeAlerts(), bad=alerts.filter(a=>a.lvl==='bad').length;
+  const all=opAgreements().map(k=>({k,...agreementPL(k),...agreementOps(k),h:agreementHealth(k)}));
   const self=all.filter(x=>x.k.type==='تشغيل ذاتي'), inv=all.filter(x=>x.k.type==='مستثمر');
-  const S=f=>sum(self,f), I=f=>sum(inv,f);
-  const months=[...new Set(F.map(f=>f.date.slice(0,7)))].sort().slice(-12);
-  const kOf=f=>Store.get('contracts',f.contractId||agreementFor(f.assetId)?.id||'')?.type;
-  const mSelfRev=months.map(mo=>sum(F.filter(f=>f.kind==='إيراد'&&kOf(f)==='تشغيل ذاتي'&&f.date.startsWith(mo)),'amount'));
-  const mSelfExp=months.map(mo=>sum(F.filter(f=>f.kind==='مصروف'&&kOf(f)==='تشغيل ذاتي'&&f.date.startsWith(mo)),'amount'));
-  const mInvRev=months.map(mo=>sum(F.filter(f=>f.kind==='إيراد'&&kOf(f)==='مستثمر'&&f.date.startsWith(mo)),'amount'));
-  const mk=(l,val,sub='',c='var(--gold)',extra='')=>`<div class="card kpi" style="--kc:${c}"><div class="l">${l}</div><div class="v">${val}</div>${sub?`<div class="s">${sub}</div>`:''}${extra}</div>`;
+  const S=f=>sum(self,f), I=f=>sum(inv,f), PM=portfolioMetrics(all), nm=x=>x.k.type==='مستثمر'?x.k.party:x.k.title;
+  const agN=n=>n===1?'اتفاقية واحدة':n===2?'اتفاقيتان':n<=10?`${n} اتفاقيات`:`${n} اتفاقية`;
+  const gross=S('rev')+I('due'), per=(x,g=gross)=>g?Math.round(Math.max(0,x)/g*100):0;
+  const score=all.length?Math.round(all.reduce((s,x)=>s+x.h.score,0)/all.length):0;
+  const grade=score>=80?['ممتازة','#7fd1a8']:score>=60?['جيدة','#8fc0e0']:score>=40?['تحتاج متابعة','#e6c067']:['حرجة','#f08a7c'];
+  const noPay=all.filter(x=>x.k.payToAuthority===''||x.k.payToAuthority==null);
+  const verdict=!all.length?'لا توجد اتفاقيات تشغيلية بعد. أضف مشروعاً من صفحة التشغيل الذاتي أو الإسناد لمستثمر.'
+    :PM.profit<0?`المحفظة تخسر ${short(-PM.profit)} سنوياً بعد سداد الهيئة الملكية.`
+    :PM.pay&&PM.coverage<1.2?`المحفظة رابحة، لكن هامش الأمان ضيق: الدخل يغطي التزام الهيئة الملكية ${PM.coverage.toFixed(1)} مرة فقط.`
+    :PM.pay?`المحفظة رابحة، والدخل يغطي التزام الهيئة الملكية ${PM.coverage.toFixed(1)} مرة.`:'المحفظة رابحة، ولا يوجد التزام مسجل للهيئة الملكية.';
+  /* شريط «أين يذهب كل ريال»: تكاليف التشغيل، ثم الهيئة الملكية، ثم ما يبقى ربحاً */
+  const flow=(g,c,a,p)=>{ const tot=Math.max(g,c+a,1), w=x=>Math.max(0,x)/tot*100; return `<div class="dflow" role="img" aria-label="تكاليف ${per(c,g)}%، الهيئة الملكية ${per(a,g)}%، ربح ${per(p,g)}%"><i class="c" style="width:${w(c)}%"></i><i class="a" style="width:${w(a)}%"></i><i class="p" style="width:${w(p)}%"></i></div>`; };
+  const leg=(g,c,a,p)=>`<div class="dleg"><span><i class="c"></i>تكاليف التشغيل <b>${short(c)}</b> <em>${per(c,g)}%</em></span><span><i class="a"></i>الهيئة الملكية <b>${short(a)}</b> <em>${per(a,g)}%</em></span><span><i class="p"></i>${p<0?'عجز':'يبقى ربحاً'} <b>${short(p)}</b> <em>${p<0?'':per(p,g)+'%'}</em></span></div>`;
+  /* ما يحتاج قراراً: مرتّب حسب المبلغ المتأثر */
+  const D=[];
+  inv.filter(x=>x.daysLeft!=null&&x.daysLeft<=90).forEach(x=>D.push({amt:x.due,u:'دخل سنوي',tone:'bad',go:'#investor',t:x.daysLeft<0?`انتهى عقد ${nm(x)} منذ ${-x.daysLeft} يوماً`:`عقد ${nm(x)} ينتهي خلال ${x.daysLeft} يوماً`,s:'القرار المطلوب: تجديد، أو إعادة طرح، أو تشغيل ذاتي. ادرسه في «دراسة وتحليل الفرصة».'}));
+  if(PM.arrears>0) D.push({amt:PM.arrears,u:'متأخرات',tone:PM.aging[3][1]>0?'bad':'warn',go:'#operations',t:`متأخرات على المستأجرين، ونسبة التحصيل ${Math.round(PM.collection)}%`,s:PM.aging[3][1]>0?`منها ${short(PM.aging[3][1])} أقدم من 90 يوماً، وهذه تحتاج إجراءً نظامياً.`:'كلها أحدث من 90 يوماً، فتكفي المتابعة.'});
+  if(PM.vacancyLoss>0) D.push({amt:PM.vacancyLoss,u:'دخل ضائع سنوياً',tone:'warn',go:'#operations',t:`${PM.vacant} وحدة شاغرة في التشغيل الذاتي`,s:`الإشغال الفعلي ${pct(PM.occ,PM.units)}%. كل نقطة إشغال تساوي ${short(PM.pgi/100)} سنوياً.`});
+  all.filter(x=>x.h.score<40).forEach(x=>D.push({amt:Math.abs(x.profit),u:x.profit<0?'خسارة سنوية':'ربح سنوي',tone:'bad',go:x.k.type==='مستثمر'?'#investor':'#operations',t:`${nm(x)}: صحة الاتفاقية ${x.h.score} من 100`,s:x.h.weakest?`أضعف عنصر: ${x.h.weakest.l}.`:''}));
+  if(noPay.length) D.push({amt:0,w:PM.noi,tone:'warn',go:'#contracts',t:`${agN(noPay.length)} بلا مبلغ محدد للهيئة الملكية`,s:'الأرباح المعروضة أعلى من الحقيقة حتى يُدخل المبلغ في الاتفاقية.'});
+  if(PM.unpriced) D.push({amt:0,w:1,tone:'warn',go:'#operations',t:`${PM.unpriced} وحدة بلا إيجار محدد`,s:'الدخل الممكن والإشغال الاقتصادي لا يحسبانها.'});
+  D.sort((a,b)=>(b.w??b.amt)-(a.w??a.amt));
+  /* المؤشرات الحيوية */
+  const occE=pct(PM.occRent,PM.pgi), col=Math.round(PM.collection);
+  const vit=(l,val,cls,word,w,tick,note)=>`<div class="dv"><div class="l">${l}</div><div class="v">${val} <span class="pill ${cls}">${word}</span></div><div class="dmeter"><i class="${cls}" style="width:${Math.max(2,Math.min(100,w))}%"></i>${tick!=null?`<u style="inset-inline-start:${tick}%"></u>`:''}</div><div class="s">${note}</div></div>`;
+  const cC=PM.coverage>=1.5?'ok':PM.coverage>=1.1?'warn':'bad', oC=occE>=90?'ok':occE>=75?'warn':'bad', lC=col>=95?'ok':col>=85?'warn':'bad', wC=PM.wale>=2?'ok':PM.wale>=1?'warn':'bad';
+  const left=d=>d==null?'—':d<0?'<span class="pill bad">منتهٍ</span>':d<=90?`<span class="pill bad">${d} يوم</span>`:d<365?`${Math.round(d/30)} شهر`:`${(d/365).toFixed(1)} سنة`;
   const payCell=x=>x.k.payToAuthority===''||x.k.payToAuthority==null?'<span class="pill warn">غير محدد</span>':num(x.pay);
-  const selfUnits=S('units'), selfOcc=S('occ'), invDue=I('due'), invRev=I('rev'), ending=inv.filter(x=>x.daysLeft!=null&&x.daysLeft<=90);
-  const PM=portfolioMetrics(all), top=PM.conc[0], topShare=top?pct(top.v,PM.concTot):0, bad=alerts.filter(a=>a.lvl==='bad').length;
-  const covCls=PM.coverage>=1.5?'ok':PM.coverage>=1.1?'warn':'bad', colCls=PM.collection>=95?'ok':PM.collection>=85?'warn':'bad';
-  const story=[`المحفظة تحقق دخلاً تشغيلياً صافياً قدره ${short(PM.noi)} سنوياً، وبعد سداد ${short(PM.pay)} للهيئة الملكية يبقى ربح ${short(PM.profit)}.`,
-    PM.pay?`الدخل يغطي التزام الهيئة ${PM.coverage.toFixed(1)} مرة${PM.coverage<1.2?'، وهو هامش أمان ضيق':''}.`:'',
-    top&&topShare>=40?`${top.l} وحده يمثل ${topShare}% من الدخل، وهذا تركّز يستحق المتابعة.`:'',
-    PM.arrears?`متأخرات المستأجرين ${short(PM.arrears)} ونسبة التحصيل ${Math.round(PM.collection)}%.`:'',
-    PM.unpriced?`${PM.unpriced} وحدة في التشغيل الذاتي بلا إيجار محدد، فالدخل المحتمل أعلى مما يظهر.`:''].filter(Boolean);
+  const months=[...new Set(F.map(f=>f.date.slice(0,7)))].sort().slice(-12), kOf=f=>Store.get('contracts',f.contractId||agreementFor(f.assetId)?.id||'')?.type;
+  const mS=(kind,type)=>months.map(mo=>sum(F.filter(f=>f.kind===kind&&kOf(f)===type&&f.date.startsWith(mo)),'amount'));
+  const mSelfRev=mS('إيراد','تشغيل ذاتي'), mSelfExp=mS('مصروف','تشغيل ذاتي'), mInvRev=mS('إيراد','مستثمر');
+  const ending=inv.filter(x=>x.daysLeft!=null&&x.daysLeft<=90), R=Store.coll('requirements').filter(r=>inv.some(x=>x.k.id===r.contractId)), rq=reqStats(R);
+  const obs=obsStats(Store.coll('observations').filter(o=>omContracts().some(k=>k.id===o.contractId)));
+  const share=x=>PM.profit>0?`يساهم بـ${per(x,PM.profit)}% من ربح المحفظة`:'';
   v.innerHTML=`
-  <div class="card exec mb">
-    <div class="exh"><div><div class="small muted">${esc(Store.data.settings.projectName)} · الملخص التنفيذي · <span class="num">${todayStr()}</span></div><h3>${all.length} اتفاقية تشغيلية: ${self.length} تشغيل ذاتي و${inv.length} إسناد تشغيل لمستثمر</h3></div>
-      <a class="pill ${bad?'bad':'warn'} exal" href="#alerts">🔔 ${alerts.length} تنبيه${bad?` · ${bad} حرجة`:''}</a></div>
-    <p class="exs">${story.map(esc).join(' ')}</p>
-  </div>
-  <div class="secl">الأداء المالي</div>
-  <div class="grid g4 mb">
-    ${mk('صافي الدخل التشغيلي NOI',short(PM.noi),`تشغيل ذاتي ${short(PM.selfNoi)} · مستثمرون ${short(PM.invNoi)}`,'var(--green)')}
-    ${mk('صافي الربح بعد الهيئة',short(PM.profit),`هامش ${pct(PM.profit,PM.noi)}% من الدخل التشغيلي`,'var(--sky)')}
-    ${mk('العائد على قيمة الأصول',`${PM.yieldOn.toFixed(1)}%`,`الدخل التشغيلي ÷ قيمة الأصول ${short(PM.value)}`,'var(--gold)')}
-    ${mk('تغطية التزام الهيئة',`${PM.coverage.toFixed(2)} مرة`,`<span class="pill ${covCls}">${covCls==='ok'?'مريحة':covCls==='warn'?'مقبولة':'ضيقة'}</span> الدخل التشغيلي ${short(PM.noi)} ÷ التزام الهيئة ${short(PM.pay)}`,'var(--wood)')}
-  </div>
-  <div class="secl">الأداء التشغيلي</div>
-  <div class="grid g4 mb">
-    ${mk('الإشغال الاقتصادي',`${pct(PM.occRent,PM.pgi)}%`,`الإشغال الفعلي ${pct(PM.occ,PM.units)}% (${PM.occ} من ${PM.units} وحدة)`,'var(--gold)',`<div class="bar" style="margin-top:6px"><i style="width:${pct(PM.occRent,PM.pgi)}%"></i></div>`)}
-    ${mk('الدخل الضائع من الشواغر',short(PM.vacancyLoss),`${PM.vacant} وحدة شاغرة${PM.unpriced?` · ${PM.unpriced} بلا إيجار محدد`:''}`,'var(--red)')}
-    ${mk('نسبة التحصيل',`${Math.round(PM.collection)}%`,`<span class="pill ${colCls}">${short(PM.duePaid)} من ${short(PM.dueAmt)} مستحق</span>`,'var(--green)',`<div class="bar" style="margin-top:6px"><i style="width:${Math.round(PM.collection)}%"></i></div>`)}
-    ${mk('متوسط المدة المتبقية للعقود WALE',`${PM.wale.toFixed(1)} سنة`,'مرجّح بالدخل (إيجارات ومستثمرون)','var(--sky)')}
-  </div>
-  <div class="split mb">
-    <div class="mode self agp" data-go="#operations">
-      <div class="agh"><h4>🏠 التشغيل الذاتي <span class="en">Self-Operation</span></h4><span class="pill gold">${self.length} اتفاقية</span></div>
-      <div class="mk">
-        ${mk('الدخل',short(S('rev')),'إيراد فعلي','var(--green)')}
-        ${mk('التكاليف',short(S('exp')),'تكاليف التشغيل','var(--wood)')}
-        ${mk('ندفع للهيئة',short(S('pay')),'','var(--amber)')}
-        ${mk('صافي الربح',short(S('profit')),`هامش ${pct(S('profit'),S('rev'))}%`,'var(--sky)')}
-        ${mk('الإشغال',`${pct(selfOcc,selfUnits)}%`,`${selfOcc} من ${selfUnits} وحدة`,'var(--gold)',`<div class="bar" style="margin-top:6px"><i style="width:${pct(selfOcc,selfUnits)}%"></i></div>`)}
-        ${mk('متأخرات التحصيل',short(S('overdue')),'','var(--red)')}
-        ${(()=>{ const K=omContracts(); return mk('مقاولو التشغيل والصيانة',short(sum(K.map(k=>({p:omPaid(k)})),'p')),`مدفوع من ${short(sum(K,'value'))} سنوياً`,'var(--wood)'); })()}
-        ${(()=>{ const st=meterStats(Store.coll('meters').filter(m=>self.some(x=>x.k.id===meterAg(m)?.id))); return mk('فواتير العدادات',st.unpaidN?`${short(st.unpaidAmt)} غير مسدد`:'مسددة',`${st.count} عداد · ${st.lateN} فاتورة متأخرة`,'var(--amber)'); })()}
-        ${(()=>{ const st=obsStats(Store.coll('observations').filter(o=>omContracts().some(k=>k.id===o.contractId))); return mk('ملاحظات المقاولين',`${st.open} مفتوحة`,`أُغلق ${st.closed} من ${st.total} · ${st.overdue} متأخرة`,'var(--red)'); })()}
+  <section class="dhero mb">
+    <div class="dh-top">
+      <div class="dh-main">
+        <div class="dh-eye">الملخص التنفيذي · ${esc(Store.data.settings.projectName)} · <span class="num">${todayStr()}</span></div>
+        <div class="dh-lbl">صافي الربح السنوي بعد سداد الهيئة الملكية</div>
+        <div class="dh-big ${PM.profit<0?'neg':''}">${short(PM.profit)} <small>ر.س</small></div>
+        <p class="dh-say">${esc(verdict)}</p>
       </div>
-      <div class="twrap" style="margin-top:12px"><table class="tbl"><thead><tr><th>الاتفاقية</th><th>الوحدات</th><th>الإشغال</th><th>الدخل</th><th>التكاليف</th><th>للهيئة</th><th>الربح</th><th>متأخرات</th></tr></thead><tbody>
-        ${self.map(x=>`<tr><td>${esc(x.k.title)}<div class="small muted">${assetPlain(x.k.assetId)}</div></td><td>${num(x.units)}</td><td>${x.units?`${x.occPct}%`:'—'}</td><td>${num(x.rev)}</td><td>${num(x.exp)}</td><td>${payCell(x)}</td><td><b>${num(x.profit)}</b></td><td>${x.overdue?`<span class="pill bad">${num(x.overdue)}</span>`:'—'}</td></tr>`).join('')||'<tr><td colspan=8 class="empty">لا اتفاقيات تشغيل ذاتي</td></tr>'}
-      </tbody></table></div>
-      <a class="btn" href="#operations" style="margin-top:10px">فتح التشغيل الذاتي ←</a>
+      <div class="dh-side">
+        <div class="dring" title="متوسط مؤشر صحة الاتفاقيات"><svg viewBox="0 0 84 84" width="104" height="104" aria-hidden="true"><circle cx="42" cy="42" r="34" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="7"/><circle cx="42" cy="42" r="34" fill="none" stroke="${grade[1]}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${(score/100*213.6).toFixed(1)} 213.6" transform="rotate(-90 42 42)"/></svg><div><b>${score}</b><small>من 100</small></div></div>
+        <div class="dh-sl">صحة المحفظة: <b style="color:${grade[1]}">${grade[0]}</b><br><span>${agN(all.length)}: ${self.length} تشغيل ذاتي و${inv.length} إسناد</span></div>
+        <a class="dh-al ${bad?'bad':''}" href="#alerts">🔔 ${alerts.length} تنبيه${bad?` · ${bad} حرجة`:''}</a>
+      </div>
     </div>
+    <div class="dh-flow">
+      <div class="dh-fh"><span>أين يذهب كل ريال من الدخل</span><b>إجمالي الدخل السنوي ${short(gross)}</b></div>
+      ${gross?flow(gross,S('exp'),PM.pay,PM.profit)+leg(gross,S('exp'),PM.pay,PM.profit):'<div class="dh-eye">لا يوجد دخل مسجل بعد.</div>'}
+    </div>
+  </section>
 
-    <div class="mode inv agp" data-go="#investor">
-      <div class="agh"><h4>🤝 إسناد التشغيل لمستثمر <span class="en">Investor-Operated</span></h4><span class="pill info">${inv.length} اتفاقية</span></div>
-      <div class="mk">
-        ${mk('يدفع لنا المستثمرون',short(invDue),'سنوي حسب العقود','var(--green)')}
-        ${mk('المحصّل فعلياً',short(invRev),`نسبة التحصيل ${pct(invRev,invDue)}%`,'var(--gold)',`<div class="bar gold" style="margin-top:6px"><i style="width:${Math.min(100,pct(invRev,invDue))}%"></i></div>`)}
-        ${mk('ندفع للهيئة',short(I('pay')),'التكلفة علينا','var(--amber)')}
-        ${mk('صافي الربح',short(I('profit')),`هامش ${pct(I('profit'),invDue)}%`,'var(--sky)')}
-        ${mk('الأصول المسندة',I('assets'),`${I('units')} وحدة`,'var(--wood)')}
-        ${mk('قيمة الأصول المسندة',short(I('value')),'','var(--green)')}
-        ${mk('عقود تنتهي خلال 90 يوم',ending.length,ending.map(x=>esc(x.k.party)).join('، '),'var(--red)')}
-        ${(()=>{ const R=Store.coll('requirements').filter(r=>inv.some(x=>x.k.id===r.contractId)), st=reqStats(R); return mk('متطلبات العقود',`${st.done} / ${st.total} منجز`,st.late?`${st.late} متأخر · ${st.prog} قيد التنفيذ`:`${st.prog} قيد التنفيذ`,'var(--sky)'); })()}
-      </div>
-      <div class="twrap" style="margin-top:12px"><table class="tbl"><thead><tr><th>المستثمر</th><th>يدفع لنا</th><th>المحصّل</th><th>للهيئة</th><th>الربح</th><th>الهامش</th><th>المتطلبات</th><th>ينتهي خلال</th></tr></thead><tbody>
-        ${inv.map(x=>`<tr><td>${esc(x.k.party)}<div class="small muted">${assetPlain(x.k.assetId)}</div></td><td>${num(x.due)}</td><td>${num(x.rev)} <span class="small muted">${pct(x.rev,x.due)}%</span></td><td>${payCell(x)}</td><td><b>${num(x.profit)}</b></td><td>${x.margin}%</td><td>${reqIcons(x.k.id)}</td><td>${x.daysLeft==null?'—':pill(x.daysLeft<0?'منتهي':x.daysLeft+' يوم')}</td></tr>`).join('')||'<tr><td colspan=8 class="empty">لا اتفاقيات إسناد تشغيل</td></tr>'}
-      </tbody></table></div>
-      <a class="btn" href="#investor" style="margin-top:10px">فتح إسناد التشغيل لمستثمر ←</a>
-    </div>
+  <div class="card mb ddec"><h3>يحتاج قرارك <span class="small muted">مرتّبة حسب المبلغ المتأثر</span></h3>
+    ${D.length?D.slice(0,5).map((d,i)=>`<a class="drow ${d.tone}" href="${d.go}"><span class="dn">${i+1}</span><div class="dt"><b>${esc(d.t)}</b>${d.s?`<div class="small muted">${esc(d.s)}</div>`:''}</div>${d.amt?`<div class="damt"><b>${short(d.amt)}</b><small>${d.u}</small></div>`:'<div class="damt"><small>دقة البيانات</small></div>'}<span class="dgo">←</span></a>`).join(''):'<div class="empty">لا شيء عاجل اليوم. كل الاتفاقيات ضمن الحدود.</div>'}
+    ${D.length>5?`<a class="small" href="#alerts" style="display:inline-block;margin-top:8px">${D.length===6?'وبند آخر':`و${D.length-5} بنود أخرى`} في التنبيهات</a>`:''}
   </div>
 
-  <div class="secl">مؤشر صحة الاتفاقيات</div>
-  <div class="card mb"><div class="hgrid">${all.slice().map(x=>({x,h:agreementHealth(x.k)})).sort((p,q)=>p.h.score-q.h.score).map(({x,h})=>`<div class="hrow">${healthBadge(x.k)}<div style="min-width:0"><b>${esc(x.k.type==='مستثمر'?x.k.party:x.k.title)}</b><div class="small muted">${AG_LABEL[x.k.type]}${h.weakest?` · أضعف عنصر: ${esc(h.weakest.l)} (${h.weakest.score})`:''}</div><div class="bar ${h.score<40?'red':h.score<60?'gold':''}" style="margin-top:6px"><i style="width:${h.score}%"></i></div></div></div>`).join('')}</div><div class="small muted" style="margin-top:8px">اضغط على الدرجة لرؤية تفاصيلها. الترتيب من الأضعف للأقوى.</div></div>
-  <div class="secl">التحليل</div>
-  <div class="grid g2 mb">
-    <div class="card"><h3>الدخل الشهري حسب نوع الاتفاقية</h3><div class="chart"><canvas id="c1"></canvas></div></div>
-    <div class="card"><h3>التدفق النقدي المتوقع (3 أشهر) <span class="small muted">تقديري</span></h3><div class="chart"><canvas id="cf"></canvas></div><div class="small muted" style="margin-top:6px">الداخل: أقساط المستأجرين المستحقة ودفعات المستثمرين. الخارج: حصة شهرية لالتزام الهيئة وعقود المقاولين.</div></div>
+  <div class="card mb dvit">
+    ${vit('تغطية التزام الهيئة الملكية',PM.pay?`${PM.coverage.toFixed(2)} مرة`:'—',PM.pay?cC:'warn',PM.pay?(cC==='ok'?'مريحة':cC==='warn'?'مقبولة':'ضيقة'):'غير محدد',PM.coverage/2.5*100,60,'الدخل التشغيلي ÷ ما ندفعه للهيئة. المريح 1.5 مرة فأكثر.')}
+    ${vit('الإشغال الاقتصادي',`${occE}%`,oC,oC==='ok'?'ممتاز':oC==='warn'?'متوسط':'ضعيف',occE,90,`${PM.occ} من ${PM.units} وحدة مؤجرة. الهدف 90%.`)}
+    ${vit('نسبة التحصيل',`${col}%`,lC,lC==='ok'?'ممتازة':lC==='warn'?'مقبولة':'ضعيفة',col,95,`حُصّل ${short(PM.duePaid)} من ${short(PM.dueAmt)} مستحق. الهدف 95%.`)}
+    ${vit('متوسط المدة المتبقية للعقود',`${PM.wale.toFixed(1)} سنة`,wC,wC==='ok'?'مريحة':wC==='warn'?'قصيرة':'قصيرة جداً',PM.wale/5*100,40,'مرجّحة بالدخل. أقل من سنتين يعني مخاطر تجديد قريبة.')}
   </div>
+
   <div class="grid g2 mb">
-    <div class="card"><h3>أعمار متأخرات المستأجرين <a href="#operations" class="small">التفاصيل</a></h3>${PM.arrears?`<div class="chart" style="height:220px"><canvas id="cag"></canvas></div>`:'<div class="empty">لا توجد متأخرات</div>'}</div>
-    <div class="card"><h3>جدول انتهاء العقود حسب الدخل</h3><div class="chart" style="height:220px"><canvas id="cex"></canvas></div><div class="small muted" style="margin-top:6px">الدخل السنوي الذي تنتهي عقوده في كل سنة. تركّز الانتهاء في سنة واحدة يعني مخاطر تجديد.</div></div>
+    <a class="card dmod self" href="#operations">
+      <div class="dmh"><h3>🏠 التشغيل الذاتي</h3><span class="small muted">${agN(self.length)}${share(S('profit'))?' · '+share(S('profit')):''}</span></div>
+      <div class="dm3"><div><span>الدخل</span><b>${short(S('rev'))}</b></div><div><span>الربح</span><b class="${S('profit')<0?'neg':''}">${short(S('profit'))}</b></div><div><span>الهامش</span><b>${pct(S('profit'),S('rev'))}%</b></div></div>
+      ${S('rev')?flow(S('rev'),S('exp'),S('pay'),S('profit')):''}
+      <div class="dchips"><span>الإشغال <b>${pct(S('occ'),S('units'))}%</b> (${S('occ')} من ${S('units')})</span><span class="${S('overdue')?'bad':''}">متأخرات التحصيل <b>${short(S('overdue'))}</b></span><span class="${obs.open?'warn':''}">ملاحظات مقاولين مفتوحة <b>${obs.open}</b></span></div>
+    </a>
+    <a class="card dmod inv" href="#investor">
+      <div class="dmh"><h3>🤝 إسناد التشغيل لمستثمر</h3><span class="small muted">${agN(inv.length)}${share(I('profit'))?' · '+share(I('profit')):''}</span></div>
+      <div class="dm3"><div><span>يدفع لنا المستثمرون</span><b>${short(I('due'))}</b></div><div><span>الربح</span><b class="${I('profit')<0?'neg':''}">${short(I('profit'))}</b></div><div><span>الهامش</span><b>${pct(I('profit'),I('due'))}%</b></div></div>
+      ${I('due')?flow(I('due'),0,I('pay'),I('profit')):''}
+      <div class="dchips"><span>المحصّل فعلياً <b>${pct(I('rev'),I('due'))}%</b></span><span class="${ending.length?'bad':''}">عقود تنتهي خلال 90 يوماً <b>${ending.length}</b></span><span class="${rq.late?'warn':''}">متطلبات منجزة <b>${rq.done} من ${rq.total}</b></span></div>
+    </a>
   </div>
+
+  <div class="card mb" style="padding:0"><div style="padding:16px 18px 4px"><h3>ترتيب الاتفاقيات حسب الربح <span class="small muted">اضغط درجة الصحة لتفاصيلها</span></h3></div>
+    <div class="twrap"><table class="tbl dlg"><thead><tr><th>الاتفاقية</th><th>النموذج</th><th>الصحة</th><th>الدخل</th><th>للهيئة الملكية</th><th>الربح</th><th>الهامش</th><th>حصتها من الدخل</th><th>تنتهي بعد</th></tr></thead><tbody>
+    ${all.slice().sort((a,b)=>b.profit-a.profit).map(x=>{ const incm=x.k.type==='مستثمر'?x.due:x.rev; return `<tr class="clk" data-go="${x.k.type==='مستثمر'?'#investor':'#operations'}"><td><b>${esc(nm(x))}</b><div class="small muted">${assetPlain(x.k.assetId)}</div></td><td>${pill(AG_LABEL[x.k.type])}</td><td>${healthBadge(x.k)}</td><td>${num(incm)}</td><td>${payCell(x)}</td><td class="${x.profit<0?'neg':''}"><b>${num(x.profit)}</b></td><td>${x.margin}%</td><td style="min-width:120px"><div class="bar gold"><i style="width:${per(incm)}%"></i></div><span class="small muted">${per(incm)}%</span></td><td>${left(x.daysLeft)}</td></tr>`; }).join('')||'<tr><td colspan="9" class="empty">لا توجد اتفاقيات تشغيلية</td></tr>'}
+    </tbody></table></div></div>
+
   <div class="grid g2 mb">
-    <div class="card"><h3>تركّز الدخل حسب الاتفاقية</h3><div class="chart" style="height:240px"><canvas id="ccc"></canvas></div></div>
-    <div class="card"><h3>التنبيهات <a href="#alerts" class="small">عرض الكل</a></h3>${alertsHtml(alerts,6)}</div>
+    <div class="card"><h3>الدخل والتكاليف شهرياً <span class="small muted">آخر 12 شهراً، والخط هو الصافي</span></h3><div class="chart"><canvas id="c1"></canvas></div></div>
+    <div class="card"><h3>التدفق النقدي المتوقع <span class="small muted">3 أشهر قادمة، تقديري</span></h3><div class="chart"><canvas id="cf"></canvas></div><div class="small muted" style="margin-top:6px">الداخل: أقساط المستأجرين ودفعات المستثمرين. الخارج: حصة شهرية للهيئة الملكية وعقود المقاولين.</div></div>
   </div>
-  <div class="grid">
-    <div class="card"><h3>آخر العمليات (سجل التدقيق)</h3><ul class="audit">${Store.coll('audit').slice(0,6).map(a=>`<li><b>${esc(a.action)}</b> ${esc(a.coll)} / ${esc(a.refId)} — <span class="small muted">${esc(userName(a.by))} · <span class="num">${a.at}</span></span></li>`).join('')}</ul></div>
-  </div>`;
-  v.querySelectorAll('.agp[data-go]').forEach(p=>p.querySelectorAll('.agh,.mk .card').forEach(el=>{ el.classList.add('go'); el.onclick=()=>{ location.hash=p.dataset.go; }; }));
-  Charts.make('c1','bar',months,[{label:'دخل التشغيل الذاتي',data:mSelfRev,color:COLORS[2],stack:'r'},{label:'دفعات المستثمرين',data:mInvRev,color:COLORS[3],stack:'r'},{label:'تكاليف التشغيل الذاتي',data:mSelfExp,color:COLORS[5],stack:'e'}],{scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,ticks:{callback:x=>short(x)}}}});
-  Charts.make('cf','bar',PM.cf.map(x=>x.mo),[{label:'أقساط المستأجرين',data:PM.cf.map(x=>Math.round(x.tenants)),color:COLORS[2],stack:'in'},{label:'دفعات المستثمرين',data:PM.cf.map(x=>Math.round(x.invIn)),color:COLORS[3],stack:'in'},{label:'التزام الهيئة',data:PM.cf.map(x=>Math.round(x.auth)),color:COLORS[5],stack:'out'},{label:'المقاولون',data:PM.cf.map(x=>Math.round(x.om)),color:COLORS[1],stack:'out'}],{scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,ticks:{callback:x=>short(x)}}}});
-  if(PM.arrears) Charts.make('cag','bar',PM.aging.map(b=>b[0]),[{label:'المتأخر',data:PM.aging.map(b=>b[1]),backgroundColor:['#e0b85acc','#d98a3dcc','#c25a4acc','#8e2b22cc'],borderColor:['#e0b85a','#d98a3d','#c25a4a','#8e2b22']}],{plugins:{legend:{display:false}}});
-  const ey=Object.keys(PM.expiry).sort(); Charts.make('cex','bar',ey,[{label:'عقود إيجار',data:ey.map(y=>PM.expiry[y].lease),color:COLORS[2],stack:'e'},{label:'عقود مستثمرين',data:ey.map(y=>PM.expiry[y].inv),color:COLORS[3],stack:'e'}],{scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,ticks:{callback:x=>short(x)}}}});
-  Charts.make('ccc','doughnut',PM.conc.map(x=>x.l),[{data:PM.conc.map(x=>x.v)}]);
+
+  <details class="card" id="dMore"><summary><b>تحليلات إضافية</b> <span class="small muted">أعمار المتأخرات، انتهاء العقود، تركّز الدخل، وكل التنبيهات</span></summary>
+    <div class="grid g2" style="margin-top:14px">
+      <div><h3>أعمار متأخرات المستأجرين</h3>${PM.arrears?`<div class="chart" style="height:220px"><canvas id="cag"></canvas></div>`:'<div class="empty">لا توجد متأخرات</div>'}</div>
+      <div><h3>الدخل الذي تنتهي عقوده كل سنة</h3><div class="chart" style="height:220px"><canvas id="cex"></canvas></div></div>
+      <div><h3>تركّز الدخل حسب الاتفاقية</h3><div class="chart" style="height:240px"><canvas id="ccc"></canvas></div></div>
+      <div><h3>التنبيهات <a href="#alerts" class="small">عرض الكل</a></h3>${alertsHtml(alerts,6)}</div>
+    </div>
+  </details>`;
+  v.querySelectorAll('tr[data-go]').forEach(r=>r.onclick=()=>{ location.hash=r.dataset.go; });
+  const net=months.map((_,i)=>mSelfRev[i]+mInvRev[i]-mSelfExp[i]), st={scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,ticks:{callback:x=>short(x)}}}};
+  Charts.make('c1','bar',months,[{label:'دخل التشغيل الذاتي',data:mSelfRev,color:COLORS[2],stack:'r'},{label:'دفعات المستثمرين',data:mInvRev,color:COLORS[3],stack:'r'},{label:'تكاليف التشغيل الذاتي',data:mSelfExp,color:COLORS[5],stack:'e'},{label:'الصافي',data:net,type:'line',stack:'n',color:'#b9925a',backgroundColor:'transparent',pointRadius:2,borderWidth:2.5}],st);
+  Charts.make('cf','bar',PM.cf.map(x=>x.mo),[{label:'أقساط المستأجرين',data:PM.cf.map(x=>Math.round(x.tenants)),color:COLORS[2],stack:'in'},{label:'دفعات المستثمرين',data:PM.cf.map(x=>Math.round(x.invIn)),color:COLORS[3],stack:'in'},{label:'الهيئة الملكية',data:PM.cf.map(x=>Math.round(x.auth)),color:COLORS[5],stack:'out'},{label:'المقاولون',data:PM.cf.map(x=>Math.round(x.om)),color:COLORS[1],stack:'out'}],st);
+  let drawn=false; $('#dMore',v).addEventListener('toggle',e=>{ if(!e.target.open||drawn) return; drawn=true;
+    if(PM.arrears) Charts.make('cag','bar',PM.aging.map(b=>b[0]),[{label:'المتأخر',data:PM.aging.map(b=>b[1]),backgroundColor:['#e0b85acc','#d98a3dcc','#c25a4acc','#8e2b22cc'],borderColor:['#e0b85a','#d98a3d','#c25a4a','#8e2b22']}],{plugins:{legend:{display:false}}});
+    const ey=Object.keys(PM.expiry).sort(); Charts.make('cex','bar',ey,[{label:'عقود إيجار',data:ey.map(y=>PM.expiry[y].lease),color:COLORS[2],stack:'e'},{label:'عقود مستثمرين',data:ey.map(y=>PM.expiry[y].inv),color:COLORS[3],stack:'e'}],st);
+    Charts.make('ccc','doughnut',PM.conc.map(x=>x.l),[{data:PM.conc.map(x=>x.v)}]); });
 }};
 
 /* 2. الاتفاقيات ونموذج التشغيل */
@@ -1295,7 +1304,7 @@ function wiAdvice(D,S){ const {v,R,best,closePick}=D, b=R[best], sb='team', s=R.
 M.whatif={key:'whatif',label:'دراسة وتحليل الفرصة',icon:'🔍',group:'الرئيسية',render(v){
   const st=WIView, {S,v:val,sv}=wiVals(), D=wiDecide(val), A=wiAdvice(D,S), R=D.R;
   const Q=WI_FD.filter(f=>f.g==='q'); if(st.step===undefined) st.step=sv.done?null:0;
-  const toolbar=`<div class="toolbar"><span class="muted">حلّل أي مشروع جديد: أجب عن الأسئلة، ويقترح لك طريقة التشغيل الأنسب وأرقامها.</span><span class="sp"></span><button class="btn sm" id="wiReset">↺ دراسة مشروع جديد</button></div>`;
+  const toolbar=`<div class="toolbar"><span class="wlead">حلّل أي مشروع جديد: أجب عن الأسئلة، ويقترح لك طريقة التشغيل الأنسب وأرقامها.</span><span class="sp"></span><button class="btn sm" id="wiReset">↺ دراسة مشروع جديد</button></div>`;
   const bindTop=()=>{ $('#wiReset',v).onclick=()=>ask('ستُمسح إجابات الدراسة الحالية وتبدأ الأسئلة من جديد لمشروع آخر.',()=>{ delete Store.data.wiStudies[WI_KEY]; Store.save(); st.opt=''; st.step=0; M.whatif.render(v); },'دراسة جديدة'); };
   const disp=f=>{ const x=val[f.id]; if(f.opts) return f.opts[x]?.l||'—'; if(!x&&['qOffer','qCash'].includes(f.id)) return f.id==='qCash'?'غير محددة':'لا يوجد'; if(f.id==='qH') return wiYrs(x); if(f.id==='qRamp') return x?`${x} شهر`:'فوري'; return `${Number(x).toLocaleString('en-US')} ${f.u||''}`; };
   if(st.step!=null){ const i=Math.max(0,Math.min(Q.length-1,st.step)), f=Q[i], cur=val[f.id], sug=f.def(val,S), from=f.src&&f.src(S);
@@ -1533,7 +1542,7 @@ const App={
     let html=`<div class="brand"><div class="mark">${MADAR_MARK}</div><div><h1>مدار الأصول<small>منصة إدارة الأصول العقارية</small></h1></div></div></div>`; let g='';
     NAV_ORDER.forEach(k=>{ const m=M[k]; if(m.group!==g){ g=m.group; html+=`<div class="group">${g}</div>`; } html+=`<a class="item" href="#${k}" data-k="${k}"><span class="ic">${m.icon}</span>${m.label}<span class="badge hidden" data-b="${k}"></span></a>`; });
     $('#nav').innerHTML=html; this.refreshBadges();
-    $('#nav').onclick=e=>{ if(e.target.closest('a.item')&&innerWidth>900) document.querySelector('.app').classList.add('nav-off'); };
+    $('#nav').onclick=e=>{ const it=e.target.closest('a.item'); if(!it) return; if(innerWidth>900) document.querySelector('.app').classList.add('nav-off'); if(it.dataset.k==='whatif'){ WIView.step=0; if(location.hash==='#whatif') App.render(); } };
   },
   refreshBadges(){
     const b={alerts:computeAlerts().length};
