@@ -1135,7 +1135,7 @@ function healthModal(id){ const k=Store.get('contracts',id); if(!k) return; cons
     <table class="tbl" style="margin-top:12px"><thead><tr><th>العنصر</th><th>الوزن</th><th>الدرجة</th><th></th><th>التفسير</th></tr></thead><tbody>
     ${h.comps.map(c=>`<tr><td>${esc(c.l)}</td><td>${c.w}%</td><td><b>${c.score==null?'—':c.score}</b></td><td style="min-width:110px">${c.score==null?'<span class="small muted">لا يُحسب</span>':`<div class="bar ${c.score<40?'red':c.score<60?'gold':''}"><i style="width:${c.score}%"></i></div>`}</td><td class="small">${esc(c.note)}</td></tr>`).join('')}
     </tbody></table><p class="small muted" style="margin-top:10px">80 فأكثر ممتاز، 60 إلى 79 جيد، 40 إلى 59 يحتاج متابعة، أقل من 40 حرج. العناصر غير المتوفرة لا تُحسب ويُعاد توزيع وزنها.</p>`,
-    footer:`<button class="btn" onclick="Modal.close()">إغلاق</button><button class="btn" onclick="Modal.close();WIView.k='${k.id}';location.hash='#whatif'">🔍 دراسة الفرص</button>`}); }
+    footer:`<button class="btn" onclick="Modal.close()">إغلاق</button><button class="btn" onclick="Modal.close();location.hash='#whatif'">🔍 دراسة الفرص</button>`}); }
 document.addEventListener('click',e=>{ const b=e.target.closest('.hbadge[data-h]'); if(b&&!b.closest('.modal')){ e.stopPropagation(); e.preventDefault(); healthModal(b.dataset.h); } },true);
 
 const MADAR_MARK=`<svg viewBox="0 0 152 140" width="36" height="33" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M10 0H142Q152 0 152 10V116L128 140H42V84L0 104V10Q0 0 10 0ZM42 38V100H112V38Z"/><path fill="#b9925a" d="M0 118L42 96V140H10Q0 140 0 130Z"/></svg>`;
@@ -1151,22 +1151,21 @@ const WI_YN={yes:{l:'نعم'},no:{l:'لا، يحتاج تجهيزاً'}};
 const WI_PAY={a:{l:'سنوي مقدم'},q:{l:'ربع سنوي'},m:{l:'شهري'}};
 const WI_WHO={us:{l:'نحن'},inv:{l:'المستثمر'}};
 /* ما يقرأه النموذج من النظام عن الاتفاقية */
-function wiSys(k){ const p=agreementPL(k), o=agreementOps(k), self=k.type!=='مستثمر';
-  const units=Store.coll('assets').filter(u=>u.level==='unit'&&agreementFor(u.id)?.id===k.id), priced=units.filter(u=>Number(u.rent)>0);
-  const rent=priced.length?sum(priced,'rent')/priced.length:(self?breakEven(k).sugUnit:0);
-  return {self,units:units.length,pricedN:priced.length,rent:Math.round((rent||0)/100)*100,occ:self&&o.units?Math.max(50,o.occPct):null,opexPct:self&&p.rev?Math.round(p.exp/p.rev*100):null,auth:Number(k.payToAuthority)||0,offer:self?0:p.due}; }
+/* الدراسة لمشروع جديد: لا تُقرأ بيانات من النظام، كل القيم من إجاباتك أو تقديرات السوق */
+function wiSys(){ return {self:false,units:0,pricedN:0,rent:0,occ:null,opexPct:null,auth:0,offer:0}; }
+const WI_KEY='new';
 /* تعريف كل المدخلات: الأسئلة العامة (q) ثم الافتراضات التفصيلية. القيمة الافتراضية تُحسب من النظام ومن إجابات الأسئلة */
 const r100=x=>Math.round((x||0)/100)*100, r1000=x=>Math.round((x||0)/1000)*1000;
 const WI_FD=[
-  {id:'qUnits',g:'q',s:'الوحدات',min:1,l:'كم وحدة قابلة للتأجير؟',u:'وحدة',def:(v,S)=>S.units,src:S=>S.units?'من النظام':''},
-  {id:'qRent',g:'q',s:'الإيجار السنوي',min:0,l:'كم متوسط الإيجار السنوي للوحدة؟',u:'ر.س',def:(v,S)=>S.rent,src:S=>S.pricedN?'من إيجارات الوحدات':S.self&&S.rent?'سعر التعادل':''},
+  {id:'qUnits',g:'q',s:'الوحدات',min:1,req:1,l:'كم وحدة قابلة للتأجير؟',u:'وحدة',def:(v,S)=>S.units,src:S=>S.units?'من النظام':''},
+  {id:'qRent',g:'q',s:'الإيجار السنوي',min:0,req:1,l:'كم متوسط الإيجار السنوي للوحدة؟',u:'ر.س',def:(v,S)=>S.rent,src:S=>S.pricedN?'من إيجارات الوحدات':S.self&&S.rent?'سعر التعادل':''},
   {id:'auth',g:'q',s:'المسدد للهيئة سنوياً',min:0,l:'كم تدفع للهيئة الملكية سنوياً مقابل الاتفاقية؟',u:'ر.س',def:(v,S)=>S.auth,src:S=>S.auth?'من الاتفاقية':''},
   {id:'authUp',g:'q',s:'دفعة الاتفاقية المقطوعة',min:0,l:'هل للاتفاقية مبلغ مقطوع للهيئة الملكية (عند التوقيع أو رسوم)؟',u:'ر.س',def:()=>0,hint:'صفر إن لم يوجد'},
-  {id:'qOcc',g:'q',s:'الإشغال',min:0,max:100,l:'كم تتوقع نسبة الإشغال بعد الاستقرار؟',u:'%',def:(v,S)=>S.occ||85,src:S=>S.occ?'الإشغال الحالي':''},
-  {id:'qRamp',g:'q',s:'الوصول للإشغال',min:0,max:60,l:'كم شهراً يحتاج حتى يصل لهذا الإشغال؟',u:'شهر',def:(v,S)=>S.self&&S.occ&&v.qReady==='yes'?0:12},
+  {id:'qOcc',g:'q',s:'الإشغال',min:0,max:100,l:'كم تتوقع نسبة الإشغال بعد الاستقرار؟',u:'%',def:()=>85,src:S=>S.occ?'الإشغال الحالي':''},
+  {id:'qRamp',g:'q',s:'الوصول للإشغال',min:0,max:60,l:'كم شهراً يحتاج حتى يصل لهذا الإشغال؟',u:'شهر',def:v=>v.qReady==='yes'?6:12},
   {id:'qCond',g:'q',s:'حالة الأصل',l:'ما حالة الأصل؟',opts:WI_COND,def:()=>'mid'},
-  {id:'qReady',g:'q',s:'جاهز للتأجير',l:'هل الأصل جاهز للتأجير الآن؟',opts:WI_YN,def:(v,S)=>S.self?'yes':'no'},
-  {id:'qTeam',g:'q',s:'فريق التشغيل',l:'هل لديك فريق تأجير وتشغيل وتحصيل؟',opts:WI_TEAM,def:(v,S)=>S.self?'part':'no'},
+  {id:'qReady',g:'q',s:'جاهز للتأجير',l:'هل الأصل جاهز للتأجير الآن؟',opts:WI_YN,def:()=>'no'},
+  {id:'qTeam',g:'q',s:'فريق التشغيل',l:'هل لديك فريق تأجير وتشغيل وتحصيل؟',opts:WI_TEAM,def:()=>'part'},
   {id:'qOffer',g:'q',s:'عرض المستثمر',min:0,l:'كم عرض المستثمر السنوي؟',u:'ر.س',def:(v,S)=>S.offer,src:S=>S.offer?'العقد الحالي':'',hint:'اتركه صفراً إن لم يصلك عرض، وتظهر لك أقل قيمة تقبلها'},
   {id:'qCash',g:'q',s:'السيولة المتاحة',min:0,l:'كم السيولة المتاحة لهذا الأصل؟',u:'ر.س',def:()=>0,hint:'صفر = لم تُحدد، فلا نختبر كفاية السيولة'},
   {id:'qH',g:'q',s:'مدة القرار',min:1,max:30,l:'كم سنة مدة القرار؟',u:'سنة',def:()=>5},
@@ -1174,7 +1173,7 @@ const WI_FD=[
   // التوقيت والاستثمار الأولي
   {id:'setup',g:'التوقيت والاستثمار الأولي',l:'تكلفة تجهيز الأصل للتشغيل الذاتي',u:'ر.س',def:v=>v.qReady==='yes'?0:r1000(v.qUnits*WI_COND[v.qCond].setup),hint:'تشطيب، أثاث، أنظمة، تسويق الإطلاق'},
   {id:'setupM',g:'التوقيت والاستثمار الأولي',l:'مدة التجهيز قبل بدء الإيرادات',u:'شهر',def:v=>v.qReady==='yes'?0:WI_COND[v.qCond].setupM,hint:'يُصرف التجهيز موزعاً على هذه الأشهر'},
-  {id:'invCost',g:'التوقيت والاستثمار الأولي',l:'تكاليف أولية نتحملها عند الإسناد',u:'ر.س',def:(v,S)=>S.self?50000:0,hint:'الطرح والتقييم والاستشارات القانونية والتسليم'},
+  {id:'invCost',g:'التوقيت والاستثمار الأولي',l:'تكاليف أولية نتحملها عند الإسناد',u:'ر.س',def:()=>50000,hint:'الطرح والتقييم والاستشارات القانونية والتسليم'},
   // الإيرادات
   {id:'rGrow',g:'الإيرادات',l:'نمو الإيجارات سنوياً',u:'%',def:()=>2},
   {id:'coll',g:'الإيرادات',l:'نسبة التحصيل الفعلي من الإيجارات',u:'%',def:v=>v.qTeam==='yes'?96:v.qTeam==='part'?93:90},
@@ -1187,7 +1186,7 @@ const WI_FD=[
   // عرض المستثمر
   {id:'esc',g:'عرض المستثمر',l:'الزيادة الدورية على العرض',u:'%',def:()=>5},
   {id:'escN',g:'عرض المستثمر',l:'كل كم سنة تُطبَّق الزيادة',u:'سنة',def:()=>3},
-  {id:'grace',g:'عرض المستثمر',l:'فترة سماح بدون دفع',u:'شهر',def:(v,S)=>S.self?6:0,hint:'يطلبها المستثمر عادة لفترة التجهيز'},
+  {id:'grace',g:'عرض المستثمر',l:'فترة سماح بدون دفع',u:'شهر',def:v=>v.qReady==='yes'?2:6,hint:'يطلبها المستثمر عادة لفترة التجهيز'},
   {id:'payT',g:'عرض المستثمر',l:'مواعيد سداد المستثمر',opts:WI_PAY,def:()=>'q'},
   // الالتزامات التعاقدية
   {id:'authInv',g:'الالتزامات التعاقدية',l:'من يدفع التزام الهيئة عند الإسناد؟',opts:WI_WHO,def:()=>'us'},
@@ -1225,8 +1224,8 @@ const WI_WHY={
 const WI_BY=Object.fromEntries(WI_FD.map(f=>[f.id,f]));
 /* المدخلات المالية الاثنا عشر ومدى اكتمال كل منها */
 const WI_CHECK=[['مدة الاستثمار',['qH','setupM','qRamp']],['الاستثمار الأولي',['setup','invCost','authUp']],['إيرادات التشغيل الذاتي',['qUnits','qRent','qOcc','rGrow','coll']],['تكاليف التشغيل',['fixed','varPct','cGrow']],['عرض المستثمر',['qOffer','esc','escN','grace','payT']],['الالتزامات التعاقدية',['auth','authInv','oblig']],['التجديدات الرأسمالية',['renew','renewN','renewInv']],['معدل الخصم',['disc']],['القيمة المتبقية',['resid']],['السيولة التشغيلية',['wc','qCash']],['التمويل',['fin','finR','finY']],['الزكاة والضرائب',['zakat']]];
-function wiSaved(k){ const all=Store.data.wiStudies||(Store.data.wiStudies={}); return all[k.id]||(all[k.id]={v:{},t:{}}); }
-function wiVals(k){ const S=wiSys(k), sv=wiSaved(k), v={}; WI_FD.forEach(f=>{ v[f.id]=sv.t[f.id]?sv.v[f.id]:f.def(v,S); }); return {S,v,sv}; }
+function wiSaved(){ const all=Store.data.wiStudies||(Store.data.wiStudies={}); return all[WI_KEY]||(all[WI_KEY]={v:{},t:{}}); }
+function wiVals(){ const S=wiSys(), sv=wiSaved(), v={}; WI_FD.forEach(f=>{ v[f.id]=sv.t[f.id]?sv.v[f.id]:f.def(v,S); }); return {S,v,sv}; }
 /* المحاكاة الشهرية لبديل واحد. over = تعديلات مؤقتة لاختبار الضغط */
 function wiSim(V,opt,over){ const v=Object.assign({},V,over||{}), H=Math.max(1,Math.min(30,Math.round(v.qH)||1)), N=H*12, cf=new Array(N+1).fill(0);
   const rows=[...Array(H)].map((_,i)=>({y:i+1,rev:0,opex:0,fee:0,auth:0,capex:0,fin:0,zakat:0,profit:0,interest:0}));
@@ -1272,7 +1271,7 @@ function wiOccBreak(V,opt){ const f=o=>wiSim(V,opt,{qOcc:o}).npv(wiRate(V,opt));
 const wiYrs=n=>n===1?'سنة واحدة':n===2?'سنتين':n<=10?`${n} سنوات`:`${n} سنة`;
 const wiPb=(R)=>R.pb==null?'لا يُسترد خلال المدة':R.pb===0?'فوري':R.pb<12?`${R.pb} شهر`:`${(R.pb/12).toFixed(1)} سنة`;
 const SAR=n=>`${Math.round(n).toLocaleString('en-US')} ر.س`;
-function wiAdvice(k,D,S){ const {v,R,best,closePick}=D, b=R[best], sb=R.team.val>=R.pm.val?'team':'pm', s=R[sb], why=[], plan=[], cur=k.type==='مستثمر'?'inv':'team';
+function wiAdvice(D,S){ const {v,R,best,closePick}=D, b=R[best], sb=R.team.val>=R.pm.val?'team':'pm', s=R[sb], why=[], plan=[];
   if(!v.qUnits||!v.qRent) return {title:'أجب عن عدد الوحدات ومتوسط الإيجار لتظهر التوصية',why:[],plan:[],tone:'warn'};
   const minOffer=wiMinOffer(v,Math.max(R.team.val,R.pm.val)), occB=wiOccBreak(v,sb);
   const allNeg=D.cand.every(o=>R[o].val<0), z=allNeg?wiMinOffer(v,0):null, floor=z!=null?Math.max(z,minOffer||0):minOffer;
@@ -1290,21 +1289,19 @@ function wiAdvice(k,D,S){ const {v,R,best,closePick}=D, b=R[best], sb=R.team.val
     if(v.qOffer&&b.avgProfit>0) why.push(`دخل مضمون بالعقد: ${short(b.avgProfit)} في المتوسط سنوياً بعد ${v.authInv==='us'?'التزام الهيئة':'الالتزامات'}، بلا تكاليف تشغيل أو مخاطر إشغال علينا.`);
     if(v.grace&&v.qOffer) why.push(`فترة السماح (${v.grace} شهر) تكلفك ${short(v.qOffer*v.grace/12)} تقريباً، فاجعلها مقابل التزام المستثمر بالتجهيز.`);
   }
-  if(minOffer!=null) why.push(minOffer<1000&&!v.qOffer?`أي عرض من مستثمر أفضل من التشغيل الذاتي هنا، بشرط ألا تتحمل التزامات إضافية.`:Math.max(R.team.val,R.pm.val)<0&&!v.qOffer?`أي عرض يزيد على ${SAR(minOffer)} سنوياً أفضل من التشغيل الذاتي.`:v.qOffer?`أقل عرض يجعل الإسناد مساوياً للتشغيل الذاتي: ${SAR(minOffer)} سنوياً، والعرض الحالي ${v.qOffer>=minOffer?'أعلى منه':'أقل منه'}.`:`لم يصلك عرض بعد: لا تقبل أقل من ${SAR(minOffer)} سنوياً بنفس الزيادات والسماح.`);
+  if(minOffer!=null) why.push(minOffer<1000&&!v.qOffer?`أي عرض من مستثمر أفضل من التشغيل الذاتي هنا، بشرط ألا تتحمل التزامات إضافية.`:Math.max(R.team.val,R.pm.val)<0&&!v.qOffer?`أي عرض يزيد على ${SAR(minOffer)} سنوياً أفضل من التشغيل الذاتي.`:v.qOffer?`أقل عرض يجعل الإسناد مساوياً للتشغيل الذاتي: ${SAR(minOffer)} سنوياً، والعرض الذي وصلك ${v.qOffer>=minOffer?'أعلى منه':'أقل منه'}.`:`لم يصلك عرض بعد: لا تقبل أقل من ${SAR(minOffer)} سنوياً بنفس الزيادات والسماح.`);
   const need=-s.peak; if(best!=='inv'&&v.qCash>0&&need>v.qCash) why.push(`السيولة غير كافية: يحتاج التشغيل الذاتي حتى ${short(need)} في أصعب نقطة والمتاح ${short(v.qCash)}. ارفع نسبة التمويل أو قلّل التجهيز.`);
-  if(best==='inv'){ plan.push(`اطرح الأصل لمستثمرين ${floor!=null&&floor>=1000?`بحد أدنى ${SAR(floor)} سنوياً`:'بأعلى عرض يغطي التزام الهيئة'}، وزيادة ${v.esc}% كل ${wiYrs(v.escN)}.`); plan.push('اشترط ضماناً بنكياً يعادل دفعات سنة، وسداداً مقدماً لكل فترة.'); plan.push(`نُص في العقد على من يتحمل التجديدات والتزام الهيئة (الافتراض الحالي: التجديدات ${v.renewInv==='us'?'علينا':'على المستثمر'}، والتزام الهيئة ${v.authInv==='us'?'علينا':'على المستثمر'}).`); }
+  if(best==='inv'){ plan.push(`اطرح المشروع لمستثمرين ${floor!=null&&floor>=1000?`بحد أدنى ${SAR(floor)} سنوياً`:'بأعلى عرض يغطي التزام الهيئة'}، وزيادة ${v.esc}% كل ${wiYrs(v.escN)}.`); plan.push('اشترط ضماناً بنكياً يعادل دفعات سنة، وسداداً مقدماً لكل فترة.'); plan.push(`نُص في العقد على من يتحمل التجديدات والتزام الهيئة (الافتراض الحالي: التجديدات ${v.renewInv==='us'?'علينا':'على المستثمر'}، والتزام الهيئة ${v.authInv==='us'?'علينا':'على المستثمر'}).`); }
   else if(best==='pm'){ plan.push(`اطلب عروض ثلاث شركات إدارة أملاك بأتعاب لا تتجاوز ${v.pmFee}% من المحصّل.`); plan.push(`اربط الأتعاب بمؤشرات: إشغال ${v.qOcc}% وتحصيل ${v.coll}% على الأقل، مع تقرير مالي شهري.`); plan.push(`خصّص احتياطي تجديدات قرابة ${short(v.qUnits*v.renew/Math.max(1,v.renewN))} سنوياً.`); }
   else { plan.push(`جهّز فريق التأجير والتحصيل ${v.setupM?`خلال فترة التجهيز (${v.setupM} شهر)`:'قبل بدء التشغيل'}.`); plan.push(`احجز سيولة تشغيلية ${short(-b.peak)} على الأقل لتغطية الفجوة حتى يستقر التحصيل.`); plan.push(`راقب الإشغال شهرياً: نزوله تحت ${Math.round(Math.min(100,occB))}% يعني مراجعة القرار.`); }
-  const title=D.seek?'التوصية: لا تشغّله ذاتياً، واطلب عروض مستثمرين':`التوصية: ${WI_OPTS[best].l}`, action=best===cur||(best==='pm'&&cur==='team')?(best===cur?'استمر في النموذج الحالي مع الخطوات أدناه.':'حوّل التشغيل الحالي لشركة إدارة أملاك.'):best==='inv'?'ادرس طرح الأصل لمستثمر عند أقرب فرصة.':'ادرس عدم تجديد عقد المستثمر وتشغيله ذاتياً.';
+  const title=D.seek?'التوصية: لا تشغّله ذاتياً، واطلب عروض مستثمرين':`التوصية: ${WI_OPTS[best].l}`, action=D.seek?'التشغيل الذاتي خاسر بهذه الأرقام، فالأفضل البحث عن مستثمر.':best==='inv'?'اطرح المشروع لمستثمر بالشروط أدناه.':best==='pm'?'شغّله ذاتياً، وتعاقد مع شركة إدارة أملاك تتولى التأجير والتحصيل.':'شغّله ذاتياً بفريقك.';
   return {title,action,why,plan,tone:(best!=='inv'&&v.qCash>0&&need>v.qCash)||occB>100||allNeg?'warn':'ok',minOffer,occB,sb}; }
 M.whatif={key:'whatif',label:'دراسة الفرص',icon:'🔍',group:'الرئيسية',render(v){
-  const all=opAgreements(); if(!all.length){ v.innerHTML='<div class="card empty">لا توجد اتفاقيات</div>'; return; }
-  const st=WIView; if(!all.some(k=>k.id===st.k)) st.k=all[0].id; const k=Store.get('contracts',st.k), {S,v:val,sv}=wiVals(k), D=wiDecide(val), A=wiAdvice(k,D,S), R=D.R;
-  const Q=WI_FD.filter(f=>f.g==='q'); if(st.stepK!==k.id){ st.stepK=k.id; st.step=sv.done?null:0; }
-  const toolbar=`<div class="toolbar"><select id="wiK" style="width:auto">${all.map(x=>`<option value="${x.id}" ${x.id===st.k?'selected':''}>${esc(x.type==='مستثمر'?x.party+' — '+x.title:x.title)}</option>`).join('')}</select>${healthBadge(k)}<span class="small muted">الوضع الحالي: <b>${AG_LABEL[k.type]}</b></span><span class="sp"></span><button class="btn sm" id="wiReset">↺ إعادة الدراسة</button></div>`;
-  const bindTop=()=>{ $('#wiK',v).onchange=e=>{ st.k=e.target.value; st.opt=''; M.whatif.render(v); };
-    $('#wiReset',v).onclick=()=>ask('ستعود كل إجابات وافتراضات هذه الاتفاقية للقيم التلقائية، وتبدأ الأسئلة من جديد.',()=>{ delete Store.data.wiStudies[k.id]; Store.save(); st.opt=''; st.stepK=''; M.whatif.render(v); },'إعادة الدراسة'); };
-  const disp=f=>{ const x=val[f.id]; if(f.opts) return f.opts[x]?.l||'—'; if(!x&&(f.id==='qOffer'||f.id==='qCash')) return f.id==='qOffer'?'لا يوجد':'غير محددة'; if(f.id==='qH') return wiYrs(x); if(f.id==='qRamp') return x?`${x} شهر`:'فوري'; return `${Number(x).toLocaleString('en-US')} ${f.u||''}`; };
+  const st=WIView, {S,v:val,sv}=wiVals(), D=wiDecide(val), A=wiAdvice(D,S), R=D.R;
+  const Q=WI_FD.filter(f=>f.g==='q'); if(st.step===undefined) st.step=sv.done?null:0;
+  const toolbar=`<div class="toolbar"><span class="muted">حلّل أي مشروع جديد: أجب عن الأسئلة، ويقترح لك طريقة التشغيل الأنسب وأرقامها.</span><span class="sp"></span><button class="btn sm" id="wiReset">↺ دراسة مشروع جديد</button></div>`;
+  const bindTop=()=>{ $('#wiReset',v).onclick=()=>ask('ستُمسح إجابات الدراسة الحالية وتبدأ الأسئلة من جديد لمشروع آخر.',()=>{ delete Store.data.wiStudies[WI_KEY]; Store.save(); st.opt=''; st.step=0; M.whatif.render(v); },'دراسة جديدة'); };
+  const disp=f=>{ const x=val[f.id]; if(f.opts) return f.opts[x]?.l||'—'; if(!x&&['qOffer','qCash','authUp'].includes(f.id)) return f.id==='qCash'?'غير محددة':'لا يوجد'; if(f.id==='qH') return wiYrs(x); if(f.id==='qRamp') return x?`${x} شهر`:'فوري'; return `${Number(x).toLocaleString('en-US')} ${f.u||''}`; };
   if(st.step!=null){ const i=Math.max(0,Math.min(Q.length-1,st.step)), f=Q[i], cur=val[f.id], sug=f.def(val,S), from=f.src&&f.src(S);
     const W=WI_WHY[f.id]||[], full=val.qUnits*val.qRent, occI=Q.findIndex(q=>q.id==='qOcc'), atOcc=full*(val.qOcc/100);
     const side=`<aside class="card wzside"><h4>لماذا نسأل؟</h4><p>${esc(W[0]||'')}</p><h4>كيف يدخل في الحساب</h4><p>${esc(W[1]||'')}</p>${W[2]?`<h4>نصيحة</h4><p>${esc(W[2])}</p>`:''}
@@ -1319,17 +1316,18 @@ M.whatif={key:'whatif',label:'دراسة الفرص',icon:'🔍',group:'الرئ
       <h2 class="wzq">${esc(f.l)}</h2>${f.hint?`<p class="muted wzh">${esc(f.hint)}</p>`:''}
       ${f.opts?`<div class="wzo">${Object.entries(f.opts).map(([a,o])=>`<button type="button" class="wzb ${cur===a?'on':''}" data-a="${a}">${o.l}</button>`).join('')}</div>`
         :`<div class="wzn"><input id="wzI" type="number" inputmode="decimal" ${f.min!=null?`min="${f.min}"`:''} ${f.max!=null?`max="${f.max}"`:''} value="${Math.round(cur*100)/100}"><span>${f.u||''}</span></div>
-        <div class="small muted wzs">المقترح: <b>${Number(sug).toLocaleString('en-US')} ${f.u||''}</b>${from?` · ${from}`:''} ${sug!==cur?`<button type="button" class="lnk" id="wzSug">استخدمه</button>`:''}</div>`}
+        ${f.req&&!sug?'<div class="small muted wzs">أدخل الرقم الصحيح لمشروعك</div>':''}<div class="small muted wzs" ${f.req&&!sug?'hidden':''}>المقترح: <b>${Number(sug).toLocaleString('en-US')} ${f.u||''}</b>${from?` · ${from}`:''} ${sug!==cur?`<button type="button" class="lnk" id="wzSug">استخدمه</button>`:''}</div>`}
       <div class="wzf"><button class="btn" id="wzBack" ${i?'':'disabled'}>السابق</button><span class="sp"></span>${sv.done?'<button class="btn" id="wzRes">النتيجة مباشرة</button>':''}<button class="btn p" id="wzNext">${i===Q.length-1?'عرض النتيجة':'التالي'}</button></div></div>${side}</div>`;
     bindTop();
     const save=x=>{ sv.v[f.id]=x; sv.t[f.id]=1; }, go=j=>{ if(j>=Q.length){ sv.done=1; st.step=null; } else st.step=Math.max(0,j); Store.save(); M.whatif.render(v); window.scrollTo({top:0,behavior:'smooth'}); };
     const readN=()=>{ let x=Number($('#wzI',v).value); if(!isFinite(x)) x=0; if(f.min!=null) x=Math.max(f.min,x); if(f.max!=null) x=Math.min(f.max,x); return x; };
     v.querySelectorAll('.wzb').forEach(b=>b.onclick=()=>{ v.querySelectorAll('.wzb').forEach(x=>x.classList.remove('on')); b.classList.add('on'); save(b.dataset.a); setTimeout(()=>go(i+1),180); });
-    const inp=$('#wzI',v); if(inp){ inp.focus(); inp.select(); inp.onkeydown=e=>{ if(e.key==='Enter'){ save(readN()); go(i+1); } }; }
+    const inp=$('#wzI',v); if(inp){ inp.focus(); inp.select(); inp.onkeydown=e=>{ if(e.key==='Enter'){ if(need()) return; save(readN()); go(i+1); } }; }
     if($('#wzSug',v)) $('#wzSug',v).onclick=()=>{ $('#wzI',v).value=Math.round(sug*100)/100; $('#wzI',v).focus(); };
-    $('#wzNext',v).onclick=()=>{ if(inp) save(readN()); else if(!sv.t[f.id]) save(cur); go(i+1); };
+    const need=()=>{ if(inp&&f.req&&!(Number(inp.value)>0)){ toast('هذا السؤال مطلوب لحساب الدخل',true); inp.focus(); return true; } return false; };
+    $('#wzNext',v).onclick=()=>{ if(need()) return; if(inp) save(readN()); else if(!sv.t[f.id]) save(cur); go(i+1); };
     $('#wzBack',v).onclick=()=>{ if(inp) save(readN()); go(i-1); };
-    if($('#wzRes',v)) $('#wzRes',v).onclick=()=>{ if(inp) save(readN()); go(Q.length); };
+    if($('#wzRes',v)) $('#wzRes',v).onclick=()=>{ if(need()) return; if(inp) save(readN()); go(Q.length); };
     v.querySelectorAll('[data-j]').forEach(b=>b.onclick=()=>{ if(inp) save(readN()); go(Number(b.dataset.j)); });
     return; }
   if(!WI_OPTS[st.opt]) st.opt=D.best; const open=new Set([...v.querySelectorAll('details[open]')].map(d=>d.dataset.d));
@@ -1339,7 +1337,7 @@ M.whatif={key:'whatif',label:'دراسة الفرص',icon:'🔍',group:'الرئ
   const chk=WI_CHECK.map(([l,ids])=>{ const n=ids.filter(i=>sv.t[i]).length; return {l,s:n===ids.length?'ok':n?'part':'est'}; }), done=chk.filter(c=>c.s==='ok').length;
   const irrT=x=>x==null?'—':`${x.toFixed(1)}%`;
   const optCard=o=>{ const x=R[o], na=o==='inv'&&!val.qOffer; return `<button type="button" class="wopt ${o===D.best?'best':''} ${o===st.opt?'sel':''}" data-opt="${o}" style="--oc:${WI_OPTS[o].c}">
-    <div class="wh"><span>${WI_OPTS[o].ic} ${WI_OPTS[o].l}</span>${o===D.best?'<span class="pill ok">موصى به</span>':''}${(k.type==='مستثمر'?'inv':'team')===o?'<span class="pill">الحالي</span>':''}</div>
+    <div class="wh"><span>${WI_OPTS[o].ic} ${WI_OPTS[o].l}</span>${o===D.best?'<span class="pill ok">موصى به</span>':''}</div>
     ${na?'<div class="small muted" style="padding:10px 0">لا يوجد عرض بعد. أقل عرض مقبول:<div class="wbig">'+(A.minOffer==null?'—':A.minOffer<1000?'أي عرض':num(Math.round(A.minOffer))+'</div>ر.س سنوياً<div>')+'</div></div>':`
     <div class="wbig">${short(x.val)}</div><div class="small muted">القيمة الحالية الصافية بعد علاوة المخاطر (${wiRate(val,o).toFixed(1)}%)</div>
     <dl><dt>صافي الربح على ${wiYrs(x.H)}</dt><dd>${short(x.total)}</dd><dt>صافي السنة الأولى</dt><dd>${short(x.y1)}</dd><dt>متوسط الربح السنوي</dt><dd>${short(x.avgProfit)}</dd><dt>العائد الداخلي</dt><dd>${o==='inv'&&!val.invCost?'بلا استثمار':irrT(x.irr)}</dd><dt>أقصى احتياج سيولة</dt><dd>${x.peak<0?short(-x.peak):'لا يوجد'}</dd><dt>فترة الاسترداد</dt><dd>${wiPb(x)}</dd><dt>المخاطر علينا</dt><dd>${WI_OPTS[o].risk}</dd></dl>`}</button>`; };
