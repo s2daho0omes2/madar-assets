@@ -10,11 +10,11 @@ const Store={
   snapshot(raw){ try{ const day=new Date().toISOString().slice(0,10), pre=DB_KEY+'_bak_'; if(localStorage.getItem(pre+day)) return; localStorage.setItem(pre+day,raw);
       Object.keys(localStorage).filter(k=>k.startsWith(pre)).sort().slice(0,-5).forEach(k=>localStorage.removeItem(k)); }catch(e){} },
   snapshots(){ try{ const pre=DB_KEY+'_bak_'; return Object.keys(localStorage).filter(k=>k.startsWith(pre)).sort().reverse().map(k=>({day:k.slice(pre.length),kb:Math.round(localStorage.getItem(k).length/1024)})); }catch(e){ return []; } },
-  restore(day){ try{ const raw=localStorage.getItem(DB_KEY+'_bak_'+day); if(!raw) return false; JSON.parse(raw); const cur=localStorage.getItem(DB_KEY); if(cur) localStorage.setItem(DB_KEY+'_before_restore',cur); localStorage.setItem(DB_KEY,raw); return true; }catch(e){ return false; } },
+  restore(day){ try{ const raw=localStorage.getItem(DB_KEY+'_bak_'+day); if(!raw) return false; JSON.parse(raw); const cur=localStorage.getItem(DB_KEY); if(cur) localStorage.setItem(DB_KEY+'_before_restore',cur); localStorage.setItem(DB_KEY,raw); ls.set('am_push_next','1'); return true; }catch(e){ return false; } },
   load(){
     try{ const raw=ls.get(DB_KEY); if(raw){ this.data=JSON.parse(raw); this.snapshot(raw); return; } }catch(e){}
     this.data=JSON.parse(JSON.stringify(window.SEED));
-    this.save();
+    this.saveLocal(); // بيانات تجريبية أولية: بلا ختم وقت حتى لا تغلب نسخة السحابة
   },
   // دمج أي أصول جديدة في SEED لم تُضف بعد إلى البيانات المحفوظة (هياكل مشاريع جديدة)
   /* ترحيل البيانات التجريبية القديمة: يعمل مرة واحدة فقط لكل متصفح. بعدها لا يُعاد أي سجل حذفه المستخدم ولا يُملأ أي حقل أفرغه */
@@ -22,8 +22,11 @@ const Store={
   _syncSeedOnce(){ (window.SEED.contracts||[]).forEach(k=>{ const o=this.get('contracts',k.id); if(o&&o.investment==null&&k.investment!=null){ o.investment=k.investment; this._dirty=true; } }); if(this._dirty){ this._dirty=false; this.save(); } if(!this.data.settings.cleanup1){ const del=new Set(['A-0001','A-0004','A-0009','A-0018']); const gone=this.coll('assets').filter(x=>del.has(x.id)); if(gone.length){ this.data.assets=this.coll('assets').filter(x=>!del.has(x.id)); this.coll('assets').forEach(x=>{ if(del.has(x.parentId)) x.parentId=null; }); ['contracts','documents','finance','observations'].forEach(c=>this.coll(c).forEach(r=>{ if(del.has(r.assetId)) r.assetId=''; })); this.log('حذف','assets',[...del].join('،'),'حذف الأصول غير المرتبطة باتفاقية تشغيلية'); } this.data.settings.cleanup1=true; this.save(); } if(!this.data.meters){ this.data.meters=JSON.parse(JSON.stringify(window.SEED.meters||[])); this.data.meterBills=JSON.parse(JSON.stringify(window.SEED.meterBills||[])); this.save(); } if(!this.data.requirements){ this.data.requirements=JSON.parse(JSON.stringify(window.SEED.requirements||[])); this.save(); } ['contractors','evaluations','observations'].forEach(c=>{ if(!this.data[c]){ this.data[c]=JSON.parse(JSON.stringify(window.SEED[c]||[])); if(c==='contractors') (window.SEED.finance||[]).filter(f=>f.category==='عقد تشغيل وصيانة').forEach(f=>{ if(!this.coll('finance').some(x=>x.id===f.id)) this.coll('finance').push(JSON.parse(JSON.stringify(f))); }); this.save(); } }); if(!this.data.payments){ this.data.payments=JSON.parse(JSON.stringify(window.SEED.payments||[])); this.coll('clients').forEach(c=>delete c.balance); this.save(); } const have=new Set(this.coll('assets').map(a=>a.id)); let n=0; (window.SEED.assets||[]).forEach(a=>{ if(!have.has(a.id)){ this.coll('assets').push(JSON.parse(JSON.stringify(a))); n++; } }); (window.SEED.contracts||[]).forEach(k=>{ const o=this.get('contracts',k.id); if(o&&o.payFromInvestor==null&&o.payToAuthority==null&&(k.payFromInvestor!=null||k.payToAuthority!=null)){ Object.assign(o,{payToAuthority:k.payToAuthority,payFromInvestor:k.payFromInvestor,period:k.period,scope:k.scope,party:k.party,obligations:k.obligations}); delete o.costs; delete o.returns; delete o.revenueShare; n++; } }); (window.SEED.contracts||[]).forEach(k=>{ if(!this.get('contracts',k.id)){ this.coll('contracts').push(JSON.parse(JSON.stringify(k))); n++; } }); const al=this.get('contracts','K-002'); if(al&&al.payToAuthority){ delete al.payToAuthority; n++; }
     if(this.coll('finance').some(f=>f.ref==='مصدر تجريبي'&&['A-0003','A-0008','A-0004'].includes(f.assetId)&&f.kind==='مصروف')){ this.data.finance=this.coll('finance').filter(f=>!(f.ref==='مصدر تجريبي'&&['A-0003','A-0008','A-0004'].includes(f.assetId))).concat(JSON.parse(JSON.stringify((window.SEED.finance||[]).filter(f=>['A-0003','A-0008'].includes(f.assetId))))); n++; }
     this.coll('finance').forEach(f=>{ if(f.assetId==='A-0004'&&f.ref==='مصدر تجريبي'){ f.assetId='A-0008'; n++; } if(!f.contractId){ const k=agreementFor(f.assetId); if(k){ f.contractId=k.id; n++; } } }); if(n){ this.save(); } return n; },
-  save(){ try{ localStorage.setItem(DB_KEY, JSON.stringify(this.data)); }catch(e){ toast('تعذر الحفظ محلياً'); } },
-  reset(){ try{ localStorage.removeItem(DB_KEY); }catch(e){} this.data=null; this.load(); },
+  save(){ this.data._ts=Date.now(); this.saveLocal(); Cloud.push(); },
+  saveLocal(){ try{ localStorage.setItem(DB_KEY, JSON.stringify(this.data)); }catch(e){ toast('تعذر الحفظ محلياً'); } },
+  /* Firebase يحذف المصفوفات الفارغة ويحوّل المتقطعة إلى كائنات: نعيد الشكل الصحيح */
+  fix(d){ if(!d.settings) d.settings={}; Object.keys(d).forEach(k=>{ const v=d[k]; if(v&&typeof v==='object'&&!Array.isArray(v)&&!['settings','wiStudies'].includes(k)) d[k]=Object.values(v).filter(x=>x!=null); else if(Array.isArray(v)) d[k]=v.filter(x=>x!=null); }); return d; },
+  reset(){ try{ localStorage.removeItem(DB_KEY); }catch(e){} this.data=null; this.load(); this.data._ts=Date.now(); this.saveLocal(); ls.set('am_push_next','1'); },
   coll(c){ return this.data[c] || (this.data[c]=[]); },
   get(c,id){ return this.coll(c).find(x=>x.id===id); },
   gen(prefix,c){ const n=this.coll(c).length+1; let id; do{ id=`${prefix}-${String(n+Math.floor(Math.random()*9000)).padStart(4,'0')}`; }while(this.get(c,id)); return id; },
@@ -38,7 +41,7 @@ const Store={
   remove(c,id){ const i=this.coll(c).findIndex(x=>x.id===id); if(i>-1){ this.coll(c).splice(i,1); this.log('حذف',c,id,'حذف السجل'); this.save(); } },
   log(action,coll,refId,changes){ this.coll('audit').unshift({id:'LG-'+Date.now()+Math.floor(Math.random()*99), at:now(), by:App.user?.id||'u1', action, coll, refId, changes}); if(this.coll('audit').length>2000) this.coll('audit').length=2000; },
   export(){ const blob=new Blob([JSON.stringify(this.data,null,1)],{type:'application/json'}); dl(blob,'asset-mgmt-backup.json'); },
-  import(file){ const r=new FileReader(); r.onload=()=>{ try{ this.data=JSON.parse(r.result); this.save(); location.reload(); }catch(e){ toast('ملف غير صالح'); } }; r.readAsText(file); }
+  import(file){ const r=new FileReader(); r.onload=()=>{ try{ this.data=JSON.parse(r.result); this.data._ts=Date.now(); this.saveLocal(); ls.set('am_push_next','1'); location.reload(); }catch(e){ toast('ملف غير صالح'); } }; r.readAsText(file); }
 };
 const PREFIX={assets:'A',contracts:'K',documents:'DOC',finance:'FN',clients:'C',payments:'PY',contractors:'CT',evaluations:'EV',observations:'OB',requirements:'RQ',meters:'MT',meterBills:'MB',users:'u'};
 const LABELS={name:'الاسم',code:'الرمز',type:'النوع',level:'المستوى',parentId:'الأصل الأب',location:'الموقع',area:'المساحة',ownership:'الملكية',value:'القيمة',condition:'الحالة الفنية',status:'الحالة',operatingModel:'نموذج التشغيل',title:'العنوان',party:'الطرف',start:'البداية',end:'النهاية',amount:'المبلغ',cost:'التكلفة',priority:'الأولوية',kind:'النوع',assetId:'الأصل',vendorId:'المورد',budget:'الميزانية',year:'السنة',rent:'الإيجار',occupancy:'الإشغال',tenantId:'المستأجر',investment:'التكلفة الاستثمارية',meterNo:'رقم العداد',accountNo:'رقم الحساب',provider:'الجهة المزودة',payer:'السداد على',agreementId:'الاتفاقية',contractorId:'المقاول',severity:'الأهمية',closedDate:'تاريخ الإغلاق',closure:'ما تم',paid:'المسدد',paidDate:'تاريخ السداد',dueDate:'تاريخ الاستحقاق',method:'طريقة السداد',expiry:'الانتهاء',scheduled:'الموعد',completed:'الإنجاز',nextDue:'الاستحقاق القادم',score:'الدرجة',rating:'التقييم',balance:'الرصيد',x:'س',y:'ص',date:'التاريخ',category:'التصنيف',notes:'ملاحظات',number:'الرقم',obligations:'الالتزامات',renewal:'التجديد',payToAuthority:'ندفع للهيئة',payFromInvestor:'يدفع لنا المستثمر',period:'الدورية',scope:'نطاق العمل',contractId:'الاتفاقية',role:'الدور',email:'البريد',phone:'الجوال',idNo:'الهوية',sla:'SLA',contact:'التواصل',mitigation:'المعالجة',owner:'المسؤول',likelihood:'الاحتمال',impact:'الأثر',insured:'مؤمّن',justification:'المبرر',serial:'الرقم التسلسلي',warrantyEnd:'نهاية الضمان',lifeYears:'العمر الافتراضي',acquiredOn:'تاريخ الاقتناء',issued:'الإصدار',issuer:'الجهة المصدرة',clientId:'العميل',assignee:'المكلف',closed:'الإغلاق',created:'الإنشاء'};
@@ -220,6 +223,22 @@ const Charts={ list:[], destroy(){ this.list.forEach(c=>c.destroy()); this.list=
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:type==='doughnut'?'right':'top',rtl:true,labels:{usePointStyle:true}},tooltip:{rtl:true,callbacks:{label:ctx=>` ${ctx.dataset.label||ctx.label}: ${Number(extra.indexAxis==='y'?ctx.parsed.x:(ctx.parsed.y??ctx.parsed)).toLocaleString('en-US')}`}}},
         scales:type==='doughnut'||type==='pie'?{}:(extra.indexAxis==='y'?{y:{grid:{display:false}},x:{beginAtZero:true,ticks:{callback:v=>short(v)}}}:{x:{grid:{display:false}},y:{beginAtZero:true,ticks:{callback:v=>short(v)}}}),...extra}});
     this.list.push(c); return c; }
+};
+
+/* ───────────────────────── الحفظ السحابي ─────────────────────────
+   قاعدة Firebase عبر REST. المفتاح الخاص يأتي من رابط الدخول (#k=...) ويُحفظ في هذا المتصفح فقط، وغير موجود في كود الموقع.
+   بدون مفتاح يعمل النظام محلياً كما كان. */
+const Cloud={ base:'https://madar-assets-default-rtdb.europe-west1.firebasedatabase.app/madar/', key:null, timer:null, dirty:false, state:'local',
+  init(){ const m=(location.hash+location.search).match(/k=([a-f0-9]{24,})/); if(m){ ls.set('am_cloud_key',m[1]); try{ history.replaceState(null,'',location.pathname+'#dashboard'); }catch(e){} } this.key=ls.get('am_cloud_key')||null; return !!this.key; },
+  ep(p){ return this.base+this.key+(p||'')+'.json'; },
+  link(){ return this.key?location.origin+location.pathname+'#k='+this.key:''; },
+  async pull(){ const c=new AbortController(), t=setTimeout(()=>c.abort(),9000); try{ const r=await fetch(this.ep(),{cache:'no-store',signal:c.signal}); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); } finally{ clearTimeout(t); } },
+  push(){ if(!this.key) return; this.dirty=true; this.set('saving'); clearTimeout(this.timer); this.timer=setTimeout(()=>this.flush(),700); },
+  async flush(keep){ if(!this.key||!this.dirty) return; this.dirty=false; try{ const r=await fetch(this.ep(),{method:'PUT',body:JSON.stringify(Store.data),keepalive:!!keep}); if(!r.ok) throw new Error('HTTP '+r.status); if(!this.dirty) this.set('saved'); }catch(e){ this.dirty=true; this.set('error'); } },
+  /* تحديث من جهاز آخر: يُفحص عند العودة للنافذة وكل دقيقة، ولا يُطبَّق إن كان عندك حفظ معلّق */
+  async check(){ if(!this.key||this.dirty||document.querySelector('.modal')) return; try{ const r=await fetch(this.ep('/_ts'),{cache:'no-store'}); if(!r.ok) return; const t=await r.json(); if(this.state==='error') this.set('saved');
+      if(t&&t>(Store.data._ts||0)){ const d=await this.pull(); if(d&&d.settings&&!this.dirty){ Store.data=Store.fix(d); Store.saveLocal(); App.render(); App.refreshBadges(); toast('حُمّل آخر تحديث من جهاز آخر'); } } }catch(e){} },
+  set(st){ this.state=st; const el=document.getElementById('cloudSt'); if(!el) return; const T={saved:['☁ محفوظ سحابياً','ok'],saving:['⟳ جارٍ الحفظ…','warn'],error:['⚠ غير متصل · محفوظ على الجهاز','bad'],local:['محفوظ على هذا الجهاز فقط','']}[st]; el.textContent=T[0]; el.className='cst '+T[1]; el.title=st==='local'?'افتح رابط النظام الخاص لتفعيل الحفظ السحابي':''; }
 };
 
 /* ───────────────────────── Modules ───────────────────────── */
@@ -1586,10 +1605,16 @@ M.system={key:'system',label:'الإعدادات والنسخ',icon:'⚙️',gro
   v.innerHTML=`<div class="grid g2"><div class="card"><h3>بيانات النظام</h3><div class="form"><div class="f"><label>اسم المشروع</label><input id="pn" value="${esc(Store.data.settings.projectName)}"></div><div class="f"><label>العملة</label><input id="cur" value="${esc(Store.data.settings.currency)}"></div></div><button class="btn p" id="sv" style="margin-top:12px">حفظ</button></div>
   <div class="card"><h3>النسخ الاحتياطي والبيانات</h3><p class="small muted">البيانات محفوظة محلياً في هذا المتصفح. صدّر نسخة احتياطية بانتظام، وعند الرفع للإنتاج ننقلها إلى قاعدة بيانات سحابية.</p><div class="toolbar" style="margin-top:12px"><button class="btn ${IN_FRAME?'hidden':''}" id="ex">⬇ تصدير JSON</button><label class="btn">⬆ استيراد JSON<input type="file" id="im" accept=".json" class="hidden"></label><button class="btn d" id="rs">↺ إعادة البيانات التجريبية</button></div>
   <div class="small muted" style="margin-top:10px">السجلات: ${['assets','contracts','documents','finance','clients','payments','audit'].map(c=>`${c} ${Store.coll(c).length}`).join(' · ')}</div>
+  <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px"><b>الحفظ السحابي</b>
+    ${Cloud.key?`<div class="small muted">مفعّل: كل تعديل يُحفظ على السيرفر، ويظهر على أي جهاز تفتح عليه الرابط الخاص. من يملك الرابط يستطيع الاطلاع والتعديل، فلا تنشره.</div><div class="toolbar" style="margin-top:8px"><button class="btn sm" id="clCopy">نسخ الرابط الخاص لفتحه على جهاز آخر</button><button class="btn sm d" id="clOff">إيقاف السحابة على هذا الجهاز</button></div>`
+      :`<div class="small muted">غير مفعّل على هذا الجهاز: البيانات محفوظة في هذا المتصفح فقط. الصق الرابط الخاص هنا لتفعيله.</div><div class="toolbar" style="margin-top:8px"><input id="clIn" placeholder="الصق الرابط الخاص" dir="ltr" style="max-width:360px"><button class="btn sm p" id="clOn">تفعيل</button></div>`}</div>
   <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px"><b>النسخ التلقائية اليومية</b><div class="small muted">تؤخذ نسخة من بياناتك أول مرة تفتح النظام كل يوم، ويُحتفظ بآخر 5 أيام. تحديثات النظام لا تمس بياناتك.</div>
     ${Store.snapshots().map(x=>`<div class="nprow" style="padding:8px 0"><span class="num">${x.day} · ${x.kb} ك.ب</span><button class="btn sm" data-rs="${x.day}">استرجاع</button></div>`).join('')||'<div class="small muted" style="margin-top:6px">لا توجد نسخ بعد.</div>'}</div></div></div>`;
   $('#sv',v).onclick=()=>{ Store.data.settings.projectName=$('#pn',v).value; Store.data.settings.currency=$('#cur',v).value; Store.save(); toast('تم الحفظ'); };
   $('#ex',v).onclick=()=>Store.export(); $('#im',v).onchange=e=>e.target.files[0]&&Store.import(e.target.files[0]);
+  if($('#clCopy',v)) $('#clCopy',v).onclick=()=>{ const L=Cloud.link(); (navigator.clipboard?navigator.clipboard.writeText(L):Promise.reject()).then(()=>toast('نُسخ الرابط')).catch(()=>Modal.open({title:'الرابط الخاص',body:`<textarea readonly dir="ltr" style="width:100%;height:90px">${L}</textarea>`,footer:'<button class="btn" onclick="Modal.close()">إغلاق</button>'})); };
+  if($('#clOff',v)) $('#clOff',v).onclick=()=>ask('سيتوقف هذا الجهاز عن الحفظ السحابي، وتبقى نسخته المحلية. البيانات على السيرفر لا تُحذف.',()=>{ try{ localStorage.removeItem('am_cloud_key'); }catch(e){} location.reload(); },'إيقاف');
+  if($('#clOn',v)) $('#clOn',v).onclick=()=>{ const m=$('#clIn',v).value.match(/([a-f0-9]{24,})/); if(!m) return toast('الرابط غير صحيح'); ls.set('am_cloud_key',m[1]); location.reload(); };
   v.querySelectorAll('[data-rs]').forEach(b=>b.onclick=()=>ask(`سترجع البيانات إلى نسخة ${b.dataset.rs}، وتُحفظ الحالة الحالية احتياطاً.`,()=>{ if(Store.restore(b.dataset.rs)) location.reload(); else toast('تعذر الاسترجاع'); },'استرجاع'));
   $('#rs',v).onclick=()=>ask('سيتم حذف كل البيانات المحلية وإعادة البيانات التجريبية.',()=>{ Store.reset(); location.reload(); },'إعادة البيانات');
 }};
@@ -1598,8 +1623,17 @@ M.system={key:'system',label:'الإعدادات والنسخ',icon:'⚙️',gro
 const NAV_ORDER=['dashboard','whatif','cashflow','agreements','alerts','operations','investor','assets','documents','contracts','finance','users','reports','gis','system'];
 const App={
   user:null,
-  init(){
-    Store.load(); Store.syncSeed();
+  async init(){
+    Store.load();
+    if(Cloud.init()){ Cloud.set('saving');
+      try{ const force=ls.get('am_push_next')==='1'; const d=force?null:await Cloud.pull();
+        if(d&&d.settings&&(d._ts||0)>=(Store.data._ts||0)){ Store.data=Store.fix(d); Store.saveLocal(); Cloud.set('saved'); }
+        else { try{ localStorage.removeItem('am_push_next'); }catch(e){} Store.data._ts=Store.data._ts||Date.now(); Cloud.dirty=true; await Cloud.flush(); } // أول جهاز: يرفع بياناته المحلية
+      }catch(e){ Cloud.set('error'); }
+      addEventListener('focus',()=>Cloud.check()); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) Cloud.check(); else Cloud.flush(true); });
+      setInterval(()=>Cloud.check(),60000); addEventListener('pagehide',()=>Cloud.flush(true));
+    } else Cloud.set('local');
+    Store.syncSeed();
     const savedUser=ls.get('am_user')||'u1'; this.user=Store.get('users',savedUser)||Store.coll('users')[0];
     const us=$('#userSel'); us.innerHTML=Store.coll('users').map(u=>`<option value="${u.id}" ${u.id===this.user.id?'selected':''}>${esc(u.name)} — ${ROLES[u.role]}</option>`).join('');
     us.onchange=()=>{ this.user=Store.get('users',us.value); ls.set('am_user',us.value); this.render(); };
