@@ -1158,17 +1158,17 @@ function wiSys(k){ const p=agreementPL(k), o=agreementOps(k), self=k.type!=='م�
 /* تعريف كل المدخلات: الأسئلة العامة (q) ثم الافتراضات التفصيلية. القيمة الافتراضية تُحسب من النظام ومن إجابات الأسئلة */
 const r100=x=>Math.round((x||0)/100)*100, r1000=x=>Math.round((x||0)/1000)*1000;
 const WI_FD=[
-  {id:'qUnits',g:'q',l:'كم وحدة قابلة للتأجير؟',u:'وحدة',def:(v,S)=>S.units,src:S=>S.units?'من النظام':''},
-  {id:'qRent',g:'q',l:'كم متوسط الإيجار السنوي للوحدة؟',u:'ر.س',def:(v,S)=>S.rent,src:S=>S.pricedN?'من إيجارات الوحدات':S.self&&S.rent?'سعر التعادل':''},
-  {id:'qOcc',g:'q',l:'كم تتوقع الإشغال بعد الاستقرار؟',u:'%',def:(v,S)=>S.occ||85,src:S=>S.occ?'الإشغال الحالي':''},
-  {id:'qRamp',g:'q',l:'كم شهراً يحتاج حتى يصل لهذا الإشغال؟',u:'شهر',def:(v,S)=>S.self&&S.occ&&v.qReady==='yes'?0:12},
-  {id:'qCond',g:'q',l:'ما حالة الأصل؟',opts:WI_COND,def:()=>'mid'},
-  {id:'qReady',g:'q',l:'هل الأصل جاهز للتأجير الآن؟',opts:WI_YN,def:(v,S)=>S.self?'yes':'no'},
-  {id:'qTeam',g:'q',l:'هل لديك فريق تأجير وتشغيل وتحصيل؟',opts:WI_TEAM,def:(v,S)=>S.self?'part':'no'},
-  {id:'qOffer',g:'q',l:'كم عرض المستثمر السنوي؟',u:'ر.س',def:(v,S)=>S.offer,src:S=>S.offer?'العقد الحالي':'',hint:'اتركه صفراً إن لم يصلك عرض، وتظهر لك أقل قيمة تقبلها'},
-  {id:'qCash',g:'q',l:'كم السيولة المتاحة لهذا الأصل؟',u:'ر.س',def:()=>0,hint:'صفر = لم تُحدد، فلا نختبر كفاية السيولة'},
-  {id:'qH',g:'q',l:'كم سنة مدة القرار؟',u:'سنة',def:()=>5},
-  {id:'qRisk',g:'q',l:'ما مدى تقبّلك للمخاطرة؟',opts:WI_RISK,def:()=>'mid'},
+  {id:'qUnits',g:'q',s:'الوحدات',min:1,l:'كم وحدة قابلة للتأجير؟',u:'وحدة',def:(v,S)=>S.units,src:S=>S.units?'من النظام':''},
+  {id:'qRent',g:'q',s:'الإيجار السنوي',min:0,l:'كم متوسط الإيجار السنوي للوحدة؟',u:'ر.س',def:(v,S)=>S.rent,src:S=>S.pricedN?'من إيجارات الوحدات':S.self&&S.rent?'سعر التعادل':''},
+  {id:'qOcc',g:'q',s:'الإشغال',min:0,max:100,l:'كم تتوقع نسبة الإشغال بعد الاستقرار؟',u:'%',def:(v,S)=>S.occ||85,src:S=>S.occ?'الإشغال الحالي':''},
+  {id:'qRamp',g:'q',s:'الوصول للإشغال',min:0,max:60,l:'كم شهراً يحتاج حتى يصل لهذا الإشغال؟',u:'شهر',def:(v,S)=>S.self&&S.occ&&v.qReady==='yes'?0:12},
+  {id:'qCond',g:'q',s:'حالة الأصل',l:'ما حالة الأصل؟',opts:WI_COND,def:()=>'mid'},
+  {id:'qReady',g:'q',s:'جاهز للتأجير',l:'هل الأصل جاهز للتأجير الآن؟',opts:WI_YN,def:(v,S)=>S.self?'yes':'no'},
+  {id:'qTeam',g:'q',s:'فريق التشغيل',l:'هل لديك فريق تأجير وتشغيل وتحصيل؟',opts:WI_TEAM,def:(v,S)=>S.self?'part':'no'},
+  {id:'qOffer',g:'q',s:'عرض المستثمر',min:0,l:'كم عرض المستثمر السنوي؟',u:'ر.س',def:(v,S)=>S.offer,src:S=>S.offer?'العقد الحالي':'',hint:'اتركه صفراً إن لم يصلك عرض، وتظهر لك أقل قيمة تقبلها'},
+  {id:'qCash',g:'q',s:'السيولة المتاحة',min:0,l:'كم السيولة المتاحة لهذا الأصل؟',u:'ر.س',def:()=>0,hint:'صفر = لم تُحدد، فلا نختبر كفاية السيولة'},
+  {id:'qH',g:'q',s:'مدة القرار',min:1,max:30,l:'كم سنة مدة القرار؟',u:'سنة',def:()=>5},
+  {id:'qRisk',g:'q',s:'تقبّل المخاطرة',l:'ما مدى تقبّلك للمخاطرة؟',opts:WI_RISK,def:()=>'mid'},
   // التوقيت والاستثمار الأولي
   {id:'setup',g:'التوقيت والاستثمار الأولي',l:'تكلفة تجهيز الأصل للتشغيل الذاتي',u:'ر.س',def:v=>v.qReady==='yes'?0:r1000(v.qUnits*WI_COND[v.qCond].setup),hint:'تشطيب، أثاث، أنظمة، تسويق الإطلاق'},
   {id:'setupM',g:'التوقيت والاستثمار الأولي',l:'مدة التجهيز قبل بدء الإيرادات',u:'شهر',def:v=>v.qReady==='yes'?0:WI_COND[v.qCond].setupM,hint:'يُصرف التجهيز موزعاً على هذه الأشهر'},
@@ -1282,6 +1282,30 @@ function wiAdvice(k,D,S){ const {v,R,best,closePick}=D, b=R[best], sb=R.team.val
 M.whatif={key:'whatif',label:'دراسة الفرص',icon:'🔍',group:'الرئيسية',render(v){
   const all=opAgreements(); if(!all.length){ v.innerHTML='<div class="card empty">لا توجد اتفاقيات</div>'; return; }
   const st=WIView; if(!all.some(k=>k.id===st.k)) st.k=all[0].id; const k=Store.get('contracts',st.k), {S,v:val,sv}=wiVals(k), D=wiDecide(val), A=wiAdvice(k,D,S), R=D.R;
+  const Q=WI_FD.filter(f=>f.g==='q'); if(st.stepK!==k.id){ st.stepK=k.id; st.step=sv.done?null:0; }
+  const toolbar=`<div class="toolbar"><select id="wiK" style="width:auto">${all.map(x=>`<option value="${x.id}" ${x.id===st.k?'selected':''}>${esc(x.type==='مستثمر'?x.party+' — '+x.title:x.title)}</option>`).join('')}</select>${healthBadge(k)}<span class="small muted">الوضع الحالي: <b>${AG_LABEL[k.type]}</b></span><span class="sp"></span><button class="btn sm" id="wiReset">↺ إعادة الدراسة</button></div>`;
+  const bindTop=()=>{ $('#wiK',v).onchange=e=>{ st.k=e.target.value; st.opt=''; M.whatif.render(v); };
+    $('#wiReset',v).onclick=()=>ask('ستعود كل إجابات وافتراضات هذه الاتفاقية للقيم التلقائية، وتبدأ الأسئلة من جديد.',()=>{ delete Store.data.wiStudies[k.id]; Store.save(); st.opt=''; st.stepK=''; M.whatif.render(v); },'إعادة الدراسة'); };
+  const disp=f=>{ const x=val[f.id]; if(f.opts) return f.opts[x]?.l||'—'; if(!x&&(f.id==='qOffer'||f.id==='qCash')) return f.id==='qOffer'?'لا يوجد':'غير محددة'; if(f.id==='qH') return wiYrs(x); if(f.id==='qRamp') return x?`${x} شهر`:'فوري'; return `${Number(x).toLocaleString('en-US')} ${f.u||''}`; };
+  if(st.step!=null){ const i=Math.max(0,Math.min(Q.length-1,st.step)), f=Q[i], cur=val[f.id], sug=f.def(val,S), from=f.src&&f.src(S);
+    v.innerHTML=`${toolbar}<div class="card wiz"><div class="wzp"><span>السؤال ${i+1} من ${Q.length}</span><div class="bar gold"><i style="width:${Math.round((i+1)/Q.length*100)}%"></i></div></div>
+      <div class="wzdots">${Q.map((q,j)=>`<button type="button" class="${j===i?'on':''} ${sv.t[q.id]?'ok':''}" data-j="${j}" title="${esc(q.s)}" aria-label="${esc(q.s)}"></button>`).join('')}</div>
+      <h2 class="wzq">${esc(f.l)}</h2>${f.hint?`<p class="muted wzh">${esc(f.hint)}</p>`:''}
+      ${f.opts?`<div class="wzo">${Object.entries(f.opts).map(([a,o])=>`<button type="button" class="wzb ${cur===a?'on':''}" data-a="${a}">${o.l}</button>`).join('')}</div>`
+        :`<div class="wzn"><input id="wzI" type="number" inputmode="decimal" ${f.min!=null?`min="${f.min}"`:''} ${f.max!=null?`max="${f.max}"`:''} value="${Math.round(cur*100)/100}"><span>${f.u||''}</span></div>
+        <div class="small muted wzs">المقترح: <b>${Number(sug).toLocaleString('en-US')} ${f.u||''}</b>${from?` · ${from}`:''} ${sug!==cur?`<button type="button" class="lnk" id="wzSug">استخدمه</button>`:''}</div>`}
+      <div class="wzf"><button class="btn" id="wzBack" ${i?'':'disabled'}>السابق</button><span class="sp"></span>${sv.done?'<button class="btn" id="wzRes">النتيجة مباشرة</button>':''}<button class="btn p" id="wzNext">${i===Q.length-1?'عرض النتيجة':'التالي'}</button></div></div>`;
+    bindTop();
+    const save=x=>{ sv.v[f.id]=x; sv.t[f.id]=1; }, go=j=>{ if(j>=Q.length){ sv.done=1; st.step=null; } else st.step=Math.max(0,j); Store.save(); M.whatif.render(v); window.scrollTo({top:0,behavior:'smooth'}); };
+    const readN=()=>{ let x=Number($('#wzI',v).value); if(!isFinite(x)) x=0; if(f.min!=null) x=Math.max(f.min,x); if(f.max!=null) x=Math.min(f.max,x); return x; };
+    v.querySelectorAll('.wzb').forEach(b=>b.onclick=()=>{ v.querySelectorAll('.wzb').forEach(x=>x.classList.remove('on')); b.classList.add('on'); save(b.dataset.a); setTimeout(()=>go(i+1),180); });
+    const inp=$('#wzI',v); if(inp){ inp.focus(); inp.select(); inp.onkeydown=e=>{ if(e.key==='Enter'){ save(readN()); go(i+1); } }; }
+    if($('#wzSug',v)) $('#wzSug',v).onclick=()=>{ $('#wzI',v).value=Math.round(sug*100)/100; $('#wzI',v).focus(); };
+    $('#wzNext',v).onclick=()=>{ if(inp) save(readN()); else if(!sv.t[f.id]) save(cur); go(i+1); };
+    $('#wzBack',v).onclick=()=>{ if(inp) save(readN()); go(i-1); };
+    if($('#wzRes',v)) $('#wzRes',v).onclick=()=>{ if(inp) save(readN()); go(Q.length); };
+    v.querySelectorAll('[data-j]').forEach(b=>b.onclick=()=>{ if(inp) save(readN()); go(Number(b.dataset.j)); });
+    return; }
   if(!WI_OPTS[st.opt]) st.opt=D.best; const open=new Set([...v.querySelectorAll('details[open]')].map(d=>d.dataset.d));
   const tag=f=>sv.t[f.id]?'<span class="srcTag ok">مُدخل</span>':f.src&&f.src(S)?`<span class="srcTag">${f.src(S)}</span>`:'<span class="srcTag need">تقدير</span>';
   const FI=f=>`<div class="f ${f.g==='q'?'wq':''}"><label>${esc(f.l)} ${tag(f)}</label>${f.opts?`<select data-w="${f.id}">${Object.entries(f.opts).map(([a,o])=>`<option value="${a}" ${val[f.id]===a?'selected':''}>${o.l}</option>`).join('')}</select>`:`<div class="inpu"><input data-w="${f.id}" type="number" inputmode="decimal" value="${Math.round(val[f.id]*100)/100}">${f.u?`<span>${f.u}</span>`:''}</div>`}${f.hint?`<div class="small muted">${f.hint}</div>`:''}</div>`;
@@ -1295,8 +1319,9 @@ M.whatif={key:'whatif',label:'دراسة الفرص',icon:'🔍',group:'الرئ
     <dl><dt>صافي الربح على ${wiYrs(x.H)}</dt><dd>${short(x.total)}</dd><dt>صافي السنة الأولى</dt><dd>${short(x.y1)}</dd><dt>متوسط الربح السنوي</dt><dd>${short(x.avgProfit)}</dd><dt>العائد الداخلي</dt><dd>${o==='inv'&&!val.invCost?'بلا استثمار':irrT(x.irr)}</dd><dt>أقصى احتياج سيولة</dt><dd>${x.peak<0?short(-x.peak):'لا يوجد'}</dd><dt>فترة الاسترداد</dt><dd>${wiPb(x)}</dd><dt>المخاطر علينا</dt><dd>${WI_OPTS[o].risk}</dd></dl>`}</button>`; };
   const STRESS=[['الإشغال أقل بـ10 نقاط',{qOcc:val.qOcc-10}],['الإيجار أقل 10%',{qRent:val.qRent*0.9}],['التكاليف أعلى 15%',{fixed:val.fixed*1.15,varPct:val.varPct*1.15}],['تأخر بدء الإيرادات 6 أشهر',{setupM:val.setupM+6}],['التحصيل 85%',{coll:Math.min(val.coll,85)}],['العائد المطلوب +2%',{disc:val.disc+2}]].map(([l,o])=>{ const d=wiDecide(val,o); return {l,team:d.R.team.val,pm:d.R.pm.val,inv:d.R.inv.val,best:d.best}; });
   const sel=R[st.opt], rowsT=[['الإيرادات المحصّلة','rev'],['تكاليف التشغيل','opex'],['أتعاب شركة الإدارة','fee'],['التزام الهيئة والالتزامات الأخرى','auth'],['التجهيز والتجديدات والسيولة','capex'],['التمويل (سحب وسداد)','fin'],['الزكاة والضرائب','zakat']].filter(([,key])=>sel.rows.some(r=>Math.abs(r[key])>0.5));
-  v.innerHTML=`<div class="toolbar"><select id="wiK" style="width:auto">${all.map(x=>`<option value="${x.id}" ${x.id===st.k?'selected':''}>${esc(x.type==='مستثمر'?x.party+' — '+x.title:x.title)}</option>`).join('')}</select>${healthBadge(k)}<span class="small muted">الوضع الحالي: <b>${AG_LABEL[k.type]}</b></span><span class="sp"></span><button class="btn sm" id="wiReset">↺ إعادة الدراسة</button></div>
-  <div class="card mb"><h3>أسئلة عامة <span class="small muted">أجب بما تعرفه، والباقي يُقدَّر تلقائياً ويمكنك تعديله في الافتراضات التفصيلية</span></h3><div class="form wqs">${WI_FD.filter(f=>f.g==='q').map(FI).join('')}</div></div>
+  v.innerHTML=`${toolbar}
+  <div class="card mb"><div class="wsumh"><h3>إجاباتك</h3><span class="small muted">اضغط أي إجابة لتعديلها</span><span class="sp"></span><button class="btn sm" id="wzRe">مراجعة الأسئلة من البداية</button></div>
+    <div class="wsum">${Q.map((f,j)=>`<button type="button" class="wchip" data-j="${j}"><span>${esc(f.s)}</span><b>${esc(disp(f))}</b></button>`).join('')}</div></div>
   <div class="card rec ${A.tone} mb">
     <h3>${D.best?WI_OPTS[D.best].ic+' ':''}${A.title}</h3>${A.action?`<p style="margin:-4px 0 10px"><b>${A.action}</b></p>`:''}
     <div class="grid g2 wrec"><div><div class="small muted" style="margin-bottom:6px">لماذا</div><ul class="why">${A.why.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>
@@ -1322,8 +1347,8 @@ M.whatif={key:'whatif',label:'دراسة الفرص',icon:'🔍',group:'الرئ
     <div class="chart" style="margin-top:14px"><canvas id="wiC"></canvas></div>
     <div class="small muted" style="margin-top:8px">النموذج شهري: التجهيز يُصرف على أشهره، الإشغال يتصاعد حتى يستقر، الإيجار والتكاليف تنمو سنوياً، دفعات المستثمر حسب مواعيدها بعد فترة السماح، والزكاة تُحسب على ربح كل سنة. السيولة التشغيلية تُحجز عند البدء وتعود بالنهاية، والقيمة المتبقية تُضاف في آخر شهر.</div>
   </details>`;
-  $('#wiK',v).onchange=e=>{ st.k=e.target.value; st.opt=''; M.whatif.render(v); };
-  $('#wiReset',v).onclick=()=>ask('ستعود كل إجابات وافتراضات هذه الاتفاقية للقيم التلقائية.',()=>{ delete Store.data.wiStudies[k.id]; Store.save(); st.opt=''; M.whatif.render(v); },'إعادة الدراسة');
+  bindTop(); $('#wzRe',v).onclick=()=>{ st.step=0; M.whatif.render(v); window.scrollTo({top:0,behavior:'smooth'}); };
+  v.querySelectorAll('.wchip').forEach(b=>b.onclick=()=>{ st.step=Number(b.dataset.j); M.whatif.render(v); window.scrollTo({top:0,behavior:'smooth'}); });
   v.querySelectorAll('[data-w]').forEach(i=>i.onchange=()=>{ const f=WI_BY[i.dataset.w]; sv.v[f.id]=f.opts?i.value:(Number(i.value)||0); sv.t[f.id]=1; Store.save(); M.whatif.render(v); });
   v.querySelectorAll('[data-opt]').forEach(b=>b.onclick=()=>{ st.opt=b.dataset.opt; const d=v.querySelector('details[data-d="cf"]'); M.whatif.render(v); const n=v.querySelector('details[data-d="cf"]'); n.open=true; n.scrollIntoView({behavior:'smooth',block:'start'}); });
   const yl=['الآن',...sel.rows.map(r=>`سنة ${r.y}`)];

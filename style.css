@@ -288,3 +288,26 @@ details.card summary::before{content:"▸ ";color:var(--gold)} details.card[open
 .wchk span{font-size:13px;padding:5px 10px;border-radius:999px;background:var(--sand-2);color:var(--muted)}
 .wchk span.ok{background:var(--ok-bg);color:var(--ok)} .wchk span.part{background:var(--amber-bg);color:var(--amber)}
 h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
+
+/* دراسة الفرص: بطاقات الأسئلة */
+.wiz{max-width:720px;margin:24px auto;padding:28px clamp(18px,4vw,40px) 24px;display:flex;flex-direction:column;gap:16px}
+.wzp{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--muted);white-space:nowrap} .wzp .bar{flex:1}
+.wzdots{display:flex;gap:6px;flex-wrap:wrap}
+.wzdots button{all:unset;cursor:pointer;width:22px;height:6px;border-radius:4px;background:var(--sand-2)}
+.wzdots button.ok{background:var(--wood-light)} .wzdots button.on{background:var(--gold);width:34px}
+.wzdots button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.wzq{font-size:clamp(22px,3vw,30px);font-weight:800;line-height:1.35;margin:6px 0 0;text-wrap:balance}
+.wzh{margin:-6px 0 0;font-size:14px}
+.wzo{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.wzb{all:unset;box-sizing:border-box;cursor:pointer;padding:18px 16px;border:2px solid var(--line);border-radius:14px;background:var(--card);font-weight:700;font-size:16px;text-align:center;transition:border-color .15s,background .15s,transform .15s}
+.wzb:hover{border-color:var(--gold);transform:translateY(-2px)} .wzb.on{border-color:var(--gold);background:var(--sand-2)}
+.wzb:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.wzn{display:flex;align-items:center;gap:12px} .wzn input{font-size:28px;font-weight:800;padding:14px 16px;font-variant-numeric:tabular-nums} .wzn span{font-size:16px;color:var(--muted);white-space:nowrap}
+.wzs .lnk{all:unset;cursor:pointer;color:var(--gold);font-weight:700;margin-inline-start:6px;text-decoration:underline}
+.wzf{display:flex;align-items:center;gap:8px;margin-top:6px;border-top:1px solid var(--line);padding-top:16px}
+.wzf .btn{padding:10px 22px;font-size:15px}
+.wsumh{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px} .wsumh h3{margin:0}
+.wsum{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.wchip{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.wchip span{font-size:12px;color:var(--muted)} .wchip b{font-size:14px}
+.wchip:hover{border-color:var(--gold)} .wchip:focus-visible{outline:2px solid var(--gold)}
