@@ -408,8 +408,8 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
     ${big('عقود تنتهي خلال 90 يوماً',ending.length,ending.length?'bad':'ok',ending.length?'تحتاج قراراً':'لا يوجد',ending.length?ending.map(x=>esc(nm(x))).join('، '):'كل العقود سارية لأكثر من 90 يوماً')}
   </div>
   <div class="gx mini mb"><div class="gxh"><div><h2>مواقع المشاريع <span>| ${GIS_BASE.name}</span></h2><div class="small">${gpins.length?'إيرادات كل موقع مقابل المستهدف · اضغط أي موقع لملخصه':'لم تُربط مواقع بعد'}</div></div><div class="gxtabs"><a class="on" href="#gis">${gpins.length?'فتح الخريطة الكاملة ←':'حدّد مواقع المشاريع ←'}</a></div></div>
-    <div class="gxv" id="dGxv"><div class="gmap" id="dMap"><img src="${GIS_BASE.src}" alt="خريطة ${GIS_BASE.name}" draggable="false">${gpins.map(a=>gisPin(a)).join('')}</div></div>
-    <div class="gxleg"><span><i class="ok"></i>حقق المستهدف</span><span><i class="warn"></i>قريب منه</span><span><i class="bad"></i>دون المستهدف</span></div></div>
+    <div class="gxv" id="dGxv"><div class="gmap" id="dMap"><img src="${GIS_BASE.src}" class="dk" alt="خريطة ${GIS_BASE.name}" draggable="false">${gpins.map(a=>gisPin(a)).join('')}</div></div>
+    <div class="gxattr">© OpenStreetMap</div><div class="gxleg"><span><i class="ok"></i>حقق المستهدف</span><span><i class="warn"></i>قريب منه</span><span><i class="bad"></i>دون المستهدف</span></div></div>
 
   <div class="card mb"><div class="dah"><h3>التحليل المالي</h3><span class="small muted">قراءة المحلل: من أين يأتي الربح، وأين يتسرب، وأي مشروع يحمل المحفظة</span></div>
     <div class="dfin">
@@ -418,6 +418,10 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
       <div class="dfc wide"><div class="dft">الدخل المحصّل والتكاليف شهرياً <span>الفعلي لآخر 12 شهراً ثم المتوقع حتى نهاية 2027، والخط هو الصافي</span></div><div class="chart" style="height:260px"><canvas id="c1"></canvas></div><div class="dfn">${esc(fin.trNote)}</div></div>
     </div></div>
 
+  <div class="card ddec mb" style="margin-top:16px"><h3>يحتاج قرارك</h3>
+    ${D.length?D.slice(0,3).map((d,i)=>`<a class="drow ${d.tone}" href="${d.go}"><span class="dn">${i+1}</span><div class="dt"><b>${esc(d.t)}</b>${d.s?`<div class="small muted">${esc(d.s)}</div>`:''}</div>${d.amt?`<div class="damt"><b>${short(d.amt)}</b><small>${d.u}</small></div>`:'<div class="damt"><small>دقة البيانات</small></div>'}<span class="dgo">←</span></a>`).join(''):'<div class="empty">لا شيء عاجل اليوم.</div>'}
+    ${D.length>3?`<a class="small" href="#alerts" style="display:inline-block;margin-top:10px">عرض ${D.length-3} بنود أخرى</a>`:''}
+  </div>
   <div class="dtier">تفاصيل أخرى</div>
   <details class="card mb" id="dTbl"><summary><b>كل الاتفاقيات</b> <span class="small muted">الربح والصحة وموعد الانتهاء لكل اتفاقية</span></summary>
     <div class="twrap" style="margin-top:12px"><table class="tbl dlg"><thead><tr><th>الاتفاقية</th><th>النموذج</th><th>الصحة</th><th>الدخل</th><th>للهيئة الملكية</th><th>الربح</th><th>تنتهي بعد</th></tr></thead><tbody>
@@ -431,11 +435,7 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
       <div><h3>تركّز الدخل حسب الاتفاقية</h3><div class="chart" style="height:240px"><canvas id="ccc"></canvas></div></div>
       <div><h3>التنبيهات <a href="#alerts" class="small">عرض الكل</a></h3>${alertsHtml(alerts,6)}</div>
     </div>
-  </details>
-  <div class="card ddec" style="margin-top:16px"><h3>يحتاج قرارك</h3>
-    ${D.length?D.slice(0,3).map((d,i)=>`<a class="drow ${d.tone}" href="${d.go}"><span class="dn">${i+1}</span><div class="dt"><b>${esc(d.t)}</b>${d.s?`<div class="small muted">${esc(d.s)}</div>`:''}</div>${d.amt?`<div class="damt"><b>${short(d.amt)}</b><small>${d.u}</small></div>`:'<div class="damt"><small>دقة البيانات</small></div>'}<span class="dgo">←</span></a>`).join(''):'<div class="empty">لا شيء عاجل اليوم.</div>'}
-    ${D.length>3?`<a class="small" href="#alerts" style="display:inline-block;margin-top:10px">عرض ${D.length-3} بنود أخرى</a>`:''}
-  </div>`;
+  </details>`;
   v.querySelectorAll('tr[data-go]').forEach(r=>r.onclick=()=>{ location.hash=r.dataset.go; });
   gisFit($('#dGxv',v));
   v.querySelectorAll('#dMap .gpin').forEach(b=>b.onclick=()=>{ const a=Store.get('assets',b.dataset.id); Modal.open({title:esc(a.name),body:gisInfo(a),footer:`<button class="btn" onclick="Modal.close();location.hash='#gis'">فتح الخريطة</button><button class="btn p" id="gOpen">فتح ملف الأصل</button>`}); $('#gOpen').onclick=()=>{ Modal.close(); assetDetail(a); }; });
@@ -452,7 +452,7 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
     {label:'الدخل',data:fin.proj.map(p=>Math.round(p.inc)),color:'#8fa3b3'},{label:'صافي الربح',data:fin.proj.map(p=>Math.round(p.profit)),color:'#2f7d5b'},
     {label:'الهامش %',data:fin.proj.map(p=>Math.round(p.margin)),type:'line',yAxisID:'y1',color:'#b9925a',backgroundColor:'#b9925a',pointRadius:6,borderWidth:0,showLine:false}],
     {plugins:{legend:{position:'top',rtl:true,labels:{usePointStyle:true}},tooltip:{rtl:true,callbacks:{label:c=>c.dataset.yAxisID==='y1'?` الهامش: ${c.raw}%`:` ${c.dataset.label}: ${Number(c.raw).toLocaleString('en-US')} ر.س`}}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,ticks:{callback:money}},y1:{position:'right',beginAtZero:true,max:100,grid:{display:false},ticks:{callback:x=>x+'%'}}}});
-  Charts.make('c1','bar',months,[{label:'دخل التشغيل الذاتي',data:mSelfRev,color:COLORS[2],backgroundColor:fade(COLORS[2]),stack:'r'},{label:'دفعات المستثمرين',data:mInvRev,color:COLORS[3],backgroundColor:fade(COLORS[3]),stack:'r'},{label:'التكاليف والهيئة الملكية',data:mSelfExp,color:COLORS[5],backgroundColor:fade(COLORS[5]),stack:'e'},{label:'الصافي',data:net,type:'line',stack:'n',color:'#b9925a',backgroundColor:'transparent',pointRadius:2,borderWidth:2.5}],st);
+  Charts.make('c1','bar',months,[{label:'دخل التشغيل الذاتي',data:mSelfRev,color:COLORS[2],backgroundColor:fade(COLORS[2]),stack:'r'},{label:'دفعات المستثمرين',data:mInvRev,color:COLORS[3],backgroundColor:fade(COLORS[3]),stack:'r'},{label:'التكاليف والهيئة الملكية',data:mSelfExp.map(x=>-x),color:COLORS[5],backgroundColor:fade(COLORS[5]),stack:'e'},{label:'الصافي',data:net,type:'line',stack:'n',color:'#b9925a',backgroundColor:'transparent',pointRadius:2,borderWidth:2.5}],st);
   let drawn=false; $('#dMore',v).addEventListener('toggle',e=>{ if(!e.target.open||drawn) return; drawn=true;
     Charts.make('cf','bar',PM.cf.map(x=>x.mo),[{label:'إيجارات المستأجرين السنوية',data:PM.cf.map(x=>Math.round(x.tenants)),color:COLORS[2],stack:'in'},{label:'دفعات المستثمرين',data:PM.cf.map(x=>Math.round(x.invIn)),color:COLORS[3],stack:'in'},{label:'الهيئة الملكية',data:PM.cf.map(x=>Math.round(x.auth)),color:COLORS[5],stack:'out'},{label:'المقاولون',data:PM.cf.map(x=>Math.round(x.om)),color:COLORS[1],stack:'out'}],st);
     if(PM.arrears) Charts.make('cag','bar',PM.aging.map(b=>b[0]),[{label:'المتأخر',data:PM.aging.map(b=>b[1]),backgroundColor:['#e0b85acc','#d98a3dcc','#c25a4acc','#8e2b22cc'],borderColor:['#e0b85a','#d98a3d','#c25a4a','#8e2b22']}],{plugins:{legend:{display:false}}});
@@ -1367,7 +1367,7 @@ M.reports={key:'reports',label:'التقارير والتحليلات',icon:'�
 
 /* 11. الخرائط GIS */
 /* الخريطة: خريطة ينبع الصناعية مدمجة. انقر أي نقطة لربطها بمشروع موجود، وانقر الدبوس لعرض المشروع أو نقله */
-const GIS_BASE={id:'MAP-YANBU',name:'ينبع الصناعية',src:'assets/yanbu-map.webp',builtin:true};
+const GIS_BASE={id:'MAP-YANBU',name:'ينبع الصناعية',src:'assets/yanbu-dark.webp',builtin:true,dark:true}; // مرسومة من بيانات OpenStreetMap (ODbL)
 const healthBadgeOf=a=>{ const k=agreementFor(a.id); return k&&k.assetId===a.id?healthBadge(k):''; };
 /* ملخص موقع على الخريطة: يُستخدم في صفحة الخريطة ولوحة التحكم */
 const gisTone=a=>{ const t=agreementFor(a.id)?.type; return t==='تشغيل ذاتي'?'self':t==='مستثمر'?'inv':'none'; };
@@ -1399,8 +1399,8 @@ M.gis={key:'gis',label:'الخريطة',icon:'🗺️',group:'متقدم',render
         <div class="gxtabs">${Object.entries(GIS_METRICS).map(([k,x])=>`<button class="${k===m?'on':''}" data-m="${k}">${x.l}</button>`).join('')}</div>
         ${mv?'<button class="btn sm" id="mvX">إلغاء النقل</button>':''}</div>
       <div class="gxk"><div class="l">${head[0]}</div><div class="v">${head[1]} <small>${head[2]}</small></div><div class="gxs"><div><b>${pins.length}</b><span>مواقع</span></div><div><b>${occP}%</b><span>إشغال</span></div><div><b>${short(tot.arr)}</b><span>متأخرات</span></div></div></div>
-      <div class="gxv" id="gxv"><div class="gmap" id="map" style="width:${gv.zoom*100}%"><img src="${mp.src}" alt="خريطة ${esc(mp.name)}" draggable="false">${pins.map(a=>gisPin(a,(a.id===moving?'mv ':'')+(a.id===gv.sel?'sel':''),m)).join('')}</div></div>
-      <div class="gxleg"><span><i class="ok"></i>حقق المستهدف</span><span><i class="warn"></i>قريب منه</span><span><i class="bad"></i>دون المستهدف</span></div>
+      <div class="gxv" id="gxv"><div class="gmap" id="map" style="width:${gv.zoom*100}%"><img src="${mp.src}" class="${mp.dark?'dk':''}" alt="خريطة ${esc(mp.name)}" draggable="false">${pins.map(a=>gisPin(a,(a.id===moving?'mv ':'')+(a.id===gv.sel?'sel':''),m)).join('')}</div></div>
+      <div class="gxattr">© OpenStreetMap</div><div class="gxleg"><span><i class="ok"></i>حقق المستهدف</span><span><i class="warn"></i>قريب منه</span><span><i class="bad"></i>دون المستهدف</span></div>
       <div class="gxz"><button data-z="1" aria-label="تكبير">+</button><button data-z="-1" aria-label="تصغير">−</button></div>
       ${sel?`<div class="gxb"><div class="gxt"><i>${{project:'🏙️',district:'🏘️',building:'🏢'}[sel.level]||'📍'}</i><div><b>${esc(sel.name)}</b><span>${LEVELS[sel.level]} · ${ss.k?AG_LABEL[ss.k.type]:'بلا اتفاقية'}${sel.location?' · '+esc(sel.location):''}</span></div></div>
         <div class="gxbs"><div><span>الإشغال</span><b>${ss.occPct}%</b></div><div><span>الإيرادات</span><b>${ss.rev>=1e6?gisFmtM(ss.rev):Math.round(ss.rev/1e3).toLocaleString('en-US')} <small>${ss.rev>=1e6?'مليون':'ألف'}</small></b></div><div><span>من المستهدف</span><b class="${ss.revPct>=90?'ok':''}">${ss.revPct==null?'—':ss.revPct+'%'}</b></div><div><span>المتأخرات</span><b class="${ss.arr?'bad':''}">${num(ss.arr)} <small>ر.س</small></b></div></div>

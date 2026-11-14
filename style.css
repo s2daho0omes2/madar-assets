@@ -494,6 +494,8 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 /* الخريطة التفاعلية: لوحة داكنة فوق صورة الأقمار الصناعية، وبطاقات مؤشرات فوق كل موقع */
 .gmap{position:relative;line-height:0;user-select:none;background:#1b232b}
 .gmap img{width:100%;height:auto;display:block;filter:grayscale(.75) brightness(.5) contrast(1.2)}
+.gmap img.dk{filter:none}
+.gxattr{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);z-index:6;font-size:10.5px;color:rgba(230,237,242,.55);pointer-events:none}
 .gmap::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:1;background:radial-gradient(ellipse at 50% 50%,rgba(8,12,16,0) 35%,rgba(8,12,16,.55) 100%)} .gx.edit .gmap{cursor:crosshair}
 .gx{position:relative;border-radius:18px;overflow:hidden;background:#141b22;color:#eef2f5;box-shadow:0 10px 30px rgba(0,0,0,.25)}
 .gxv{overflow:auto;height:min(78vh,760px);scrollbar-width:thin}
