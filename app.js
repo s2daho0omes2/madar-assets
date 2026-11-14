@@ -415,8 +415,7 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
   <div class="card mb"><div class="dah"><h3>التحليل المالي</h3><span class="small muted">قراءة المحلل: من أين يأتي الربح، وأين يتسرب، وأي مشروع يحمل المحفظة</span></div>
     <div class="dfin">
       <div class="dfc wide"><div class="dft">من الدخل إلى صافي الربح <span>سنوياً</span></div><div class="chart" style="height:300px"><canvas id="cWf"></canvas></div><div class="dfn">${esc(fin.wfNote)}</div></div>
-      <div class="dfc"><div class="dft">ربحية كل مشروع <span>الربح والهامش</span></div><div class="chart" style="height:280px"><canvas id="cPj"></canvas></div><div class="dfn">${esc(fin.pjNote)}</div></div>
-      <div class="dfc"><div class="dft">اقتصاديات الوحدة <span>شهرياً لكل وحدة مؤجرة</span></div><div class="chart" style="height:280px"><canvas id="cUe"></canvas></div><div class="dfn">${esc(fin.ueNote)}</div></div>
+      <div class="dfc wide"><div class="dft">ربحية كل مشروع <span>الربح والهامش</span></div><div class="chart" style="height:280px"><canvas id="cPj"></canvas></div><div class="dfn">${esc(fin.pjNote)}</div></div>
       <div class="dfc wide"><div class="dft">الدخل المحصّل والتكاليف شهرياً <span>آخر 12 شهراً، والخط هو الصافي</span></div><div class="chart" style="height:260px"><canvas id="c1"></canvas></div><div class="dfn">${esc(fin.trNote)}</div></div>
     </div></div>
 
@@ -452,9 +451,6 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
     {label:'الدخل',data:fin.proj.map(p=>Math.round(p.inc)),color:'#8fa3b3'},{label:'صافي الربح',data:fin.proj.map(p=>Math.round(p.profit)),color:'#2f7d5b'},
     {label:'الهامش %',data:fin.proj.map(p=>Math.round(p.margin)),type:'line',yAxisID:'y1',color:'#b9925a',backgroundColor:'#b9925a',pointRadius:6,borderWidth:0,showLine:false}],
     {plugins:{legend:{position:'top',rtl:true,labels:{usePointStyle:true}},tooltip:{rtl:true,callbacks:{label:c=>c.dataset.yAxisID==='y1'?` الهامش: ${c.raw}%`:` ${c.dataset.label}: ${Number(c.raw).toLocaleString('en-US')} ر.س`}}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,ticks:{callback:money}},y1:{position:'right',beginAtZero:true,max:100,grid:{display:false},ticks:{callback:x=>x+'%'}}}});
-  if(fin.ue.length) Charts.make('cUe','bar',fin.ue.map(u=>u.l),[
-    {label:'تكاليف التشغيل',data:fin.ue.map(u=>Math.round(u.cost)),color:'#c25a4a',stack:'u'},{label:'الهيئة الملكية',data:fin.ue.map(u=>Math.round(u.pay)),color:'#b9925a',stack:'u'},{label:'صافي الربح',data:fin.ue.map(u=>Math.round(Math.max(0,u.net))),color:'#2f7d5b',stack:'u'}],
-    {indexAxis:'y',plugins:{legend:{position:'top',rtl:true,labels:{usePointStyle:true}},tooltip:{rtl:true,callbacks:{label:c=>` ${c.dataset.label}: ${Number(c.raw).toLocaleString('en-US')} ر.س شهرياً`}}},scales:{x:{stacked:true,beginAtZero:true,ticks:{callback:x=>Number(x).toLocaleString('en-US')}},y:{stacked:true,grid:{display:false}}}});
   Charts.make('c1','bar',months,[{label:'دخل التشغيل الذاتي',data:mSelfRev,color:COLORS[2],stack:'r'},{label:'دفعات المستثمرين',data:mInvRev,color:COLORS[3],stack:'r'},{label:'تكاليف التشغيل الذاتي',data:mSelfExp,color:COLORS[5],stack:'e'},{label:'الصافي',data:net,type:'line',stack:'n',color:'#b9925a',backgroundColor:'transparent',pointRadius:2,borderWidth:2.5}],st);
   let drawn=false; $('#dMore',v).addEventListener('toggle',e=>{ if(!e.target.open||drawn) return; drawn=true;
     Charts.make('cf','bar',PM.cf.map(x=>x.mo),[{label:'إيجارات المستأجرين السنوية',data:PM.cf.map(x=>Math.round(x.tenants)),color:COLORS[2],stack:'in'},{label:'دفعات المستثمرين',data:PM.cf.map(x=>Math.round(x.invIn)),color:COLORS[3],stack:'in'},{label:'الهيئة الملكية',data:PM.cf.map(x=>Math.round(x.auth)),color:COLORS[5],stack:'out'},{label:'المقاولون',data:PM.cf.map(x=>Math.round(x.om)),color:COLORS[1],stack:'out'}],st);
