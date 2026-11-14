@@ -1084,6 +1084,7 @@ M.operations={key:'operations',label:'التشغيل الذاتي',icon:'🏠',g
   const bld=Store.coll('assets').filter(a=>a.level==='building'&&isSelf(a));
   const lateC=Store.coll('clients').filter(c=>uid.has(c.assetId)&&clientFin(c).overdue>0).length, nP=SK.length;
   /* إجابات أسئلة المدير: كلها محسوبة من بيانات التشغيل الذاتي فقط */
+  let QAC=null;
   const QA=(()=>{ const t=todayStr(), N=x=>Math.round(x).toLocaleString('en-US'), vac=units.filter(u=>u.occupancy!=='مشغول'), rehab=vac.filter(u=>/صيانة|تأهيل|متوقف/.test(String(u.condition||'')+String(u.status||'')));
     const avgRent=occ.length?sum(occ,'rent')/occ.length:0, loss=sum(vac,'rent');
     const B=bld.map(b=>{ const u=units.filter(x=>x.parentId===b.id), o=u.filter(x=>x.occupancy==='مشغول'), ids=new Set(u.map(x=>x.id)); return {n:`${b.name} (${assetPlain(b.parentId)})`,u:u.length,o:o.length,occ:pct(o.length,u.length),rent:o.length?sum(o,'rent')/o.length:0,over:finOf(selfPays.filter(p=>ids.has(p.assetId))).overdue}; }).filter(x=>x.u);
@@ -1109,8 +1110,16 @@ M.operations={key:'operations',label:'التشغيل الذاتي',icon:'🏠',g
     if(obs.overdue) A.push({t:`${obs.overdue} ملاحظة على المقاولين تجاوزت موعد إغلاقها`,s:`المفتوح الآن ${obs.open}.`,w:who('engineer'),tone:'bad',go:'ops'});
     nextPay.filter(x=>daysTo(x.d)<=30).forEach(x=>A.push({t:`سدّد ${short(x.amt)} للهيئة الملكية عن ${x.n}`,s:`يستحق في ${x.d}.`,w:who('finance'),tone:'warn',go:'sag'}));
     est.forEach(x=>A.push({t:`سجّل التكاليف الفعلية لـ${assetPlain(x.k.assetId)}`,s:'تكاليفه الآن تقديرية بمرجع مشروع آخر.',w:who('finance'),tone:'info',go:'sag'}));
+    { const cm=curMo(), mos=[...Array(12)].map((_,i)=>addMo(cm,i-11)); // بيانات الرسوم
+      QAC={B:B.slice().sort((x,y)=>x.occ-y.occ),mos,due:mos.map(m=>sum(selfPays.filter(p=>(p.dueDate||'').startsWith(m)),'amount')),paid:mos.map(m=>selfPays.filter(p=>(p.dueDate||'').startsWith(m)).reduce((a,p)=>a+Math.min(Number(p.paid)||0,Number(p.amount)||0),0)),ag,PL:PL.map(x=>({l:assetPlain(x.k.assetId),exp:x.exp,pay:x.pay,profit:x.profit}))}; }
     const row=(q,a,n)=>`<div class="qar"><span>${q}</span><b>${a}</b>${n?`<small>${n}</small>`:''}</div>`;
     return `<div class="card mb ddec"><h3>المطلوب اليوم <span class="small muted">الإجراء والمسؤول عنه</span></h3>${A.length?A.map((x,i)=>`<a class="drow ${x.tone}" href="#" data-tab="${x.go}" data-box="${x.box||''}" data-f="${esc(JSON.stringify(x.f||{}))}"><span class="dn">${i+1}</span><div class="dt"><b>${esc(x.t)}</b><div class="small muted">${esc(x.s)}</div></div><div class="damt"><small>المسؤول</small><b style="font-size:15px">${esc(x.w)}</b></div><span class="dgo">←</span></a>`).join(''):'<div class="empty">لا إجراءات مطلوبة اليوم.</div>'}</div>
+    <div class="card mb"><div class="dah"><h3>الرسوم البيانية</h3><span class="small muted">الصورة كاملة في أربع نظرات</span></div><div class="dfin">
+      <div class="dfc"><div class="dft">الدخل أين يذهب في كل مشروع <span>سنوياً</span></div><div class="chart" style="height:260px"><canvas id="qcP"></canvas></div></div>
+      <div class="dfc"><div class="dft">المستحق والمحصّل شهرياً <span>آخر 12 شهراً</span></div><div class="chart" style="height:260px"><canvas id="qcC"></canvas></div></div>
+      <div class="dfc"><div class="dft">أعمار المتأخرات <span>كم مضى على كل مبلغ متأخر</span></div><div class="chart" style="height:260px"><canvas id="qcA"></canvas></div></div>
+      <div class="dfc"><div class="dft">إشغال كل مبنى <span>من الأضعف إلى الأقوى</span></div><div class="chart" style="height:${Math.max(260,B.length*24)}px"><canvas id="qcB"></canvas></div></div>
+    </div></div>
     <div class="grid g2 mb">
       <div class="card qa"><h3>الوحدات والإشغال</h3>
         ${row('إجمالي الوحدات',units.length,`في ${bld.length} مبنى و${SK.length} مشروع`)}${row('المؤجرة / الشاغرة',`${occ.length} / ${vac.length}`,`نسبة الإشغال ${pct(occ.length,units.length)}%`)}
@@ -1151,6 +1160,12 @@ M.operations={key:'operations',label:'التشغيل الذاتي',icon:'🏠',g
   v.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{ v.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); v.querySelectorAll('[data-p]').forEach(p=>p.classList.toggle('hidden',p.dataset.p!==b.dataset.t)); });
   renderOM($('#omBox',v)); renderMeters($('#mtBox',v));
   bindAgCards(v);
+  if(QAC){ const yM={beginAtZero:true,ticks:{callback:x=>short(x)}}, lg={position:'top',rtl:true,labels:{usePointStyle:true}}, tip=u=>({rtl:true,callbacks:{label:c=>` ${c.dataset.label}: ${Number(c.raw).toLocaleString('en-US')}${u}`}});
+    if(QAC.PL.length) Charts.make('qcP','bar',QAC.PL.map(x=>x.l),[{label:'تكاليف التشغيل',data:QAC.PL.map(x=>Math.round(x.exp)),color:'#c25a4a',stack:'s'},{label:'الهيئة الملكية',data:QAC.PL.map(x=>Math.round(x.pay)),color:'#b9925a',stack:'s'},{label:'صافي الربح',data:QAC.PL.map(x=>Math.round(Math.max(0,x.profit))),color:'#2f7d5b',stack:'s'}],{plugins:{legend:lg,tooltip:tip(' ر.س')},scales:{x:{stacked:true,grid:{display:false}},y:Object.assign({stacked:true},yM)}});
+    Charts.make('qcC','bar',QAC.mos,[{label:'المستحق',data:QAC.due.map(Math.round),color:'#8fa3b3'},{label:'المحصّل',data:QAC.paid.map(Math.round),color:'#2f7d5b'}],{plugins:{legend:lg,tooltip:tip(' ر.س')},scales:{x:{grid:{display:false}},y:yM}});
+    Charts.make('qcA','bar',['حتى 30 يوماً','31 - 60','61 - 90','أكثر من 90'],[{label:'المتأخر',data:QAC.ag.map(Math.round),backgroundColor:['#e0b85a','#d98a3d','#c25a4a','#8e2b22'],borderColor:['#e0b85a','#d98a3d','#c25a4a','#8e2b22']}],{plugins:{legend:{display:false},tooltip:tip(' ر.س')},scales:{x:{grid:{display:false}},y:yM}});
+    const bc=QAC.B.map(x=>x.occ<60?'#c25a4a':x.occ<85?'#d9a441':'#2f7d5b');
+    if(QAC.B.length) Charts.make('qcB','bar',QAC.B.map(x=>x.n),[{label:'الإشغال',data:QAC.B.map(x=>x.occ),backgroundColor:bc,borderColor:bc}],{indexAxis:'y',plugins:{legend:{display:false},tooltip:{rtl:true,callbacks:{label:c=>` الإشغال ${c.raw}% (${QAC.B[c.dataIndex].o} من ${QAC.B[c.dataIndex].u})`}}},scales:{x:{beginAtZero:true,max:100,ticks:{callback:x=>x+'%'}},y:{grid:{display:false},ticks:{autoSkip:false,font:{size:11}}}}}); }
   v.querySelectorAll('[data-tab]').forEach(a=>a.onclick=e=>{ e.preventDefault(); const b=v.querySelector(`.tabs button[data-t="${a.dataset.tab}"]`); if(!b) return; b.click(); const box=a.dataset.box&&$(a.dataset.box,v);
     if(!box){ window.scrollTo({top:0,behavior:'smooth'}); return; }
     v.querySelectorAll('#occBox select[data-f],#clBox select[data-f]').forEach(x=>{ if(x.value){ const k=x.dataset.f, bx=x.closest('#occBox,#clBox'); x.value=''; x.dispatchEvent(new Event('change')); } }); // امسح أي تصفية سابقة
