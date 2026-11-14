@@ -445,7 +445,7 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
     {indexAxis:'y',plugins:{legend:{position:'top',rtl:true,labels:{usePointStyle:true}},tooltip:{rtl:true,callbacks:{label:c=>` ${c.dataset.label}: ${Number(c.raw).toLocaleString('en-US')} ر.س شهرياً`}}},scales:{x:{stacked:true,beginAtZero:true,ticks:{callback:money}},y:{stacked:true,grid:{display:false}}}});
   Charts.make('c1','bar',months,[{label:'دخل التشغيل الذاتي',data:mSelfRev,color:COLORS[2],stack:'r'},{label:'دفعات المستثمرين',data:mInvRev,color:COLORS[3],stack:'r'},{label:'تكاليف التشغيل الذاتي',data:mSelfExp,color:COLORS[5],stack:'e'},{label:'الصافي',data:net,type:'line',stack:'n',color:'#b9925a',backgroundColor:'transparent',pointRadius:2,borderWidth:2.5}],st);
   let drawn=false; $('#dMore',v).addEventListener('toggle',e=>{ if(!e.target.open||drawn) return; drawn=true;
-    Charts.make('cf','bar',PM.cf.map(x=>x.mo),[{label:'أقساط المستأجرين',data:PM.cf.map(x=>Math.round(x.tenants)),color:COLORS[2],stack:'in'},{label:'دفعات المستثمرين',data:PM.cf.map(x=>Math.round(x.invIn)),color:COLORS[3],stack:'in'},{label:'الهيئة الملكية',data:PM.cf.map(x=>Math.round(x.auth)),color:COLORS[5],stack:'out'},{label:'المقاولون',data:PM.cf.map(x=>Math.round(x.om)),color:COLORS[1],stack:'out'}],st);
+    Charts.make('cf','bar',PM.cf.map(x=>x.mo),[{label:'إيجارات المستأجرين السنوية',data:PM.cf.map(x=>Math.round(x.tenants)),color:COLORS[2],stack:'in'},{label:'دفعات المستثمرين',data:PM.cf.map(x=>Math.round(x.invIn)),color:COLORS[3],stack:'in'},{label:'الهيئة الملكية',data:PM.cf.map(x=>Math.round(x.auth)),color:COLORS[5],stack:'out'},{label:'المقاولون',data:PM.cf.map(x=>Math.round(x.om)),color:COLORS[1],stack:'out'}],st);
     if(PM.arrears) Charts.make('cag','bar',PM.aging.map(b=>b[0]),[{label:'المتأخر',data:PM.aging.map(b=>b[1]),backgroundColor:['#e0b85acc','#d98a3dcc','#c25a4acc','#8e2b22cc'],borderColor:['#e0b85a','#d98a3d','#c25a4a','#8e2b22']}],{plugins:{legend:{display:false}}});
     const ey=Object.keys(PM.expiry).sort(); Charts.make('cex','bar',ey,[{label:'عقود إيجار',data:ey.map(y=>PM.expiry[y].lease),color:COLORS[2],stack:'e'},{label:'عقود مستثمرين',data:ey.map(y=>PM.expiry[y].inv),color:COLORS[3],stack:'e'}],st);
     Charts.make('ccc','doughnut',PM.conc.map(x=>x.l),[{data:PM.conc.map(x=>x.v)}]); });
@@ -529,8 +529,7 @@ function renderTree(c){
   $('#colAll',c).onclick=()=>{ open.clear(); renderTree(c); };
   const b=$('#addA',c); if(b) b.onclick=()=>crud(assetCrudCfg(),document.createElement('div')).form(null);
 }
-/* ───── تأجير الوحدة وإخلاؤها: خطوة واحدة بدل ثلاث (ملف المستأجر + حالة الوحدة + جدول الأقساط) ───── */
-const LEASE_PER={1:'شهري',3:'ربع سنوي',6:'نصف سنوي',12:'سنوي'};
+/* ───── تأجير الوحدة وإخلاؤها: خطوة واحدة بدل ثلاث (ملف المستأجر + حالة الوحدة + جدول الدفساط) ───── */
 function leaseUnit(a,done){
   const today=todayStr();
   Modal.open({title:`تأجير ${esc(a.name)}`,body:`<div class="form">
@@ -539,35 +538,34 @@ function leaseUnit(a,done){
     <div class="f"><label>الجوال</label><input id="lsP" inputmode="tel" dir="ltr" placeholder="05xxxxxxxx"></div>
     <div class="f"><label>الإيجار السنوي (ر.س) *</label><input id="lsR" type="number" min="0" value="${Number(a.rent)||''}"></div>
     <div class="f"><label>بداية العقد *</label><input id="lsS" type="date" value="${today}"></div>
-    <div class="f"><label>مدة العقد</label><select id="lsM"><option value="12" selected>سنة</option><option value="24">سنتان</option><option value="36">3 سنوات</option><option value="6">6 أشهر</option></select></div>
-    <div class="f"><label>طريقة الدفع</label><select id="lsQ">${Object.entries(LEASE_PER).map(([k,l])=>`<option value="${k}" ${k==='3'?'selected':''}>${l}</option>`).join('')}</select></div>
+    <div class="f"><label>مدة العقد</label><select id="lsM"><option value="12" selected>سنة</option><option value="24">سنتان</option><option value="36">3 سنوات</option></select></div>
   </div><div class="small muted" id="lsSum" style="margin-top:10px"></div>`,
   footer:`<button class="btn" onclick="Modal.close()">إلغاء</button><button class="btn p" id="lsOk">تأجير</button>`});
-  const sumUp=()=>{ const r=Number($('#lsR').value)||0, m=Number($('#lsM').value), q=Number($('#lsQ').value), n=Math.max(1,Math.round(m/q)); $('#lsSum').textContent=r?`سيُنشأ ${n} ${n===1?'قسط':'أقساط'} بقيمة ${Math.round(r*q/12).toLocaleString('en-US')} ر.س، أولها في ${$('#lsS').value||'—'}.`:''; };
-  ['lsR','lsS','lsM','lsQ'].forEach(id=>$('#'+id).addEventListener('input',sumUp)); sumUp();
-  $('#lsOk').onclick=()=>{ const name=$('#lsN').value.trim(), rent=Number($('#lsR').value)||0, start=$('#lsS').value, m=Number($('#lsM').value), q=Number($('#lsQ').value);
+  const sumUp=()=>{ const r=Number($('#lsR').value)||0, n=Math.max(1,Math.round(Number($('#lsM').value)/12)); $('#lsSum').textContent=r?`الإيجار يُحصَّل سنوياً مقدماً: ${n===1?'دفعة واحدة':n===2?'دفعتان سنويتان':n+' دفعات سنوية'} بقيمة ${Math.round(r).toLocaleString('en-US')} ر.س${n>1?' لكل سنة':''}، ${n>1?'أولها':'تستحق'} في ${$('#lsS').value||'—'}.`:''; };
+  ['lsR','lsS','lsM'].forEach(id=>$('#'+id).addEventListener('input',sumUp)); sumUp();
+  $('#lsOk').onclick=()=>{ const name=$('#lsN').value.trim(), rent=Number($('#lsR').value)||0, start=$('#lsS').value, m=Number($('#lsM').value), q=12;
     if(!name) return toast('اكتب اسم المستأجر'); if(!(rent>0)) return toast('اكتب الإيجار السنوي'); if(!start) return toast('حدد بداية العقد');
     const end=(()=>{ const d=new Date(start); d.setMonth(d.getMonth()+m); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); })();
     const c=Store.add('clients',{name,idNo:$('#lsI').value.trim(),phone:$('#lsP').value.trim(),email:'',kind:'مستأجر',assetId:a.id,status:'نشط',leaseStart:start,leaseEnd:end,notes:''});
     const k=agreementFor(a.id), n=Math.max(1,Math.round(m/q)), amt=Math.round(rent*q/12), P=Store.coll('payments');
     for(let i=0;i<n;i++){ const d=new Date(start); d.setMonth(d.getMonth()+i*q); P.push({id:`PY-${c.id}-${i+1}`,clientId:c.id,assetId:a.id,contractId:k?.id||'',seq:i+1,dueDate:d.toISOString().slice(0,10),amount:amt,paid:0,paidDate:'',method:''}); }
     Store.update('assets',a.id,{occupancy:'مشغول',status:'مؤجر',tenantId:c.id,rent,vacantSince:''});
-    Store.log('تأجير','assets',a.id,`${a.name} مؤجرة لـ${name} من ${start} إلى ${end}، ${n} أقساط × ${amt}`); Store.save();
+    Store.log('تأجير','assets',a.id,`${a.name} مؤجرة لـ${name} من ${start} إلى ${end}، ${n} دفعة سنوية × ${amt}`); Store.save();
     Modal.close(); toast(`أُجّرت ${a.name}`); done&&done(); };
 }
 function vacateUnit(a,done){
   const c=a.tenantId&&Store.get('clients',a.tenantId), today=todayStr(), P=paysOfAsset(a.id).filter(p=>!c||p.clientId===c.id);
   Modal.open({title:`إخلاء ${esc(a.name)}`,body:`<div class="form"><div class="f"><label>تاريخ الإخلاء</label><input id="vcD" type="date" value="${today}"></div></div>
-    <p class="small muted" style="margin-top:8px">${c?`المستأجر: <b>${esc(c.name)}</b>. `:''}الأقساط غير المسددة التي يحل موعدها بعد تاريخ الإخلاء تُحذف لأنها لم تعد مستحقة. الأقساط السابقة غير المسددة تبقى متأخرات على المستأجر حتى تُحصَّل.</p><div class="small" id="vcSum" style="margin-top:6px"></div>`,
+    <p class="small muted" style="margin-top:8px">${c?`المستأجر: <b>${esc(c.name)}</b>. `:''}الدفعات السنوية غير المسددة التي يحل موعدها بعد تاريخ الإخلاء تُحذف لأنها لم تعد مستحقة. الدفعات السابقة غير المسددة تبقى متأخرات على المستأجر حتى تُحصَّل.</p><div class="small" id="vcSum" style="margin-top:6px"></div>`,
     footer:`<button class="btn" onclick="Modal.close()">إلغاء</button><button class="btn d" id="vcOk">إخلاء</button>`});
   const sumUp=()=>{ const d=$('#vcD').value, fut=P.filter(p=>p.dueDate>d&&!(Number(p.paid)>0)), owed=P.filter(p=>p.dueDate<=d).reduce((t,p)=>t+Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0)),0);
-    $('#vcSum').textContent=`${fut.length?`سيُحذف ${fut.length===1?'قسط مستقبلي واحد':fut.length===2?'قسطان مستقبليان':fut.length+' أقساط مستقبلية'}`:'لا توجد أقساط مستقبلية للحذف'}${owed?`، وتبقى متأخرات ${owed.toLocaleString('en-US')} ر.س`:'، ولا توجد متأخرات'}.`; };
+    $('#vcSum').textContent=`${fut.length?`سيُحذف ${fut.length===1?'دفعة سنوية قادمة واحدة':fut.length===2?'دفعتان سنويتان قادمتان':fut.length+' دفعات سنوية قادمة'}`:'لا توجد دفعات قادمة للحذف'}${owed?`، وتبقى متأخرات ${owed.toLocaleString('en-US')} ر.س`:'، ولا توجد متأخرات'}.`; };
   $('#vcD').addEventListener('input',sumUp); sumUp();
   $('#vcOk').onclick=()=>{ const d=$('#vcD').value||today, drop=new Set(P.filter(p=>p.dueDate>d&&!(Number(p.paid)>0)).map(p=>p.id));
     Store.data.payments=Store.coll('payments').filter(p=>!drop.has(p.id));
     if(c) Store.update('clients',c.id,{status:'منتهي',leaseEnd:d});
     Store.update('assets',a.id,{occupancy:'شاغر',status:'شاغر',tenantId:'',vacantSince:d});
-    Store.log('إخلاء','assets',a.id,`إخلاء ${a.name}${c?' من '+c.name:''} بتاريخ ${d}، حُذف ${drop.size} قسط مستقبلي`); Store.save();
+    Store.log('إخلاء','assets',a.id,`إخلاء ${a.name}${c?' من '+c.name:''} بتاريخ ${d}، حُذف ${drop.size} دفعة قادمة`); Store.save();
     Modal.close(); toast(`أُخليت ${a.name}`); done&&done(); };
 }
 function assetDetail(a){
@@ -1049,7 +1047,7 @@ function generateSchedule(c,after){
   Modal.open({title:`إنشاء جدول دفعات: ${esc(c.name)}`,body:`<div class="form">
     <div class="f"><label>الإيجار السنوي *</label><input id="gA" type="number" value="${lease?.value||unit?.rent||''}"></div>
     <div class="f"><label>تاريخ أول دفعة *</label><input id="gS" type="date" value="${lease?.start||todayStr()}"></div>
-    <div class="f"><label>دورية السداد</label><select id="gN"><option value="1">سنوي (دفعة واحدة)</option><option value="2">نصف سنوي (دفعتان)</option><option value="4">ربع سنوي (4 دفعات)</option><option value="12">شهري (12 دفعة)</option></select></div>
+    <div class="f"><label>دورية السداد</label><select id="gN"><option value="1">سنوي مقدماً (دفعة واحدة كل سنة)</option></select></div>
     <div class="f"><label>عدد السنوات</label><input id="gY" type="number" value="1" min="1" max="10"></div></div>
     <p class="small muted" style="margin-top:10px">${paysOfClient(c.id).length?'تُضاف الدفعات الجديدة بعد الدفعات الموجودة.':''}</p>`,
     footer:`<button class="btn" onclick="Modal.close()">إلغاء</button><button class="btn p" id="gGo">إنشاء الجدول</button>`});
@@ -1099,32 +1097,32 @@ M.operations={key:'operations',label:'التشغيل الذاتي',icon:'🏠',g
     const ending=C.map(c=>({c,e:endOf(c)})).filter(x=>x.e&&daysTo(x.e)<=90&&daysTo(x.e)>=0);
     const dueP=selfPays.filter(p=>p.dueDate&&p.dueDate<=t), dueAmt=sum(dueP,'amount'), paid=dueP.reduce((a,p)=>a+Math.min(Number(p.paid)||0,Number(p.amount)||0),0);
     const ag=[0,0,0,0]; let oldest=0; selfPays.forEach(p=>{ const r=(Number(p.amount)||0)-(Number(p.paid)||0); if(r<=0||!p.dueDate||p.dueDate>=t) return; const dd=-daysTo(p.dueDate); oldest=Math.max(oldest,dd); ag[dd<=30?0:dd<=60?1:dd<=90?2:3]+=r; });
-    const dueToday=selfPays.filter(p=>p.dueDate>=t&&daysTo(p.dueDate)<=7&&(Number(p.paid)||0)<(Number(p.amount)||0));
+    const dueToday=selfPays.filter(p=>p.dueDate>=t&&daysTo(p.dueDate)<=30&&(Number(p.paid)||0)<(Number(p.amount)||0));
     const PL=SK.map(k=>({k,...agreementPL(k)})).filter(x=>x.live), rev=sum(PL,'rev'), exp=sum(PL,'exp'), pay=sum(PL,'pay'), est=PL.filter(x=>x.expEst), R=costRef();
     const per={'سنوي':12,'نصف سنوي':6,'ربع سنوي':3,'شهري':1}, nextPay=PL.filter(x=>x.pay).map(x=>{ const m=per[x.k.period]||12, d=new Date(x.k.start||t); for(let i=0;i<600&&d.toISOString().slice(0,10)<t;i++) d.setMonth(d.getMonth()+m); return {n:assetPlain(x.k.assetId),amt:x.pay*m/12,d:d.toISOString().slice(0,10)}; }).sort((x,y)=>x.d.localeCompare(y.d));
     const obs=obsStats(Store.coll('observations').filter(o=>omContracts().some(k=>k.id===o.contractId&&SK.some(s=>s.id===agreementFor(k.assetId)?.id))));
     const who=r=>Store.coll('users').find(u=>u.role===r)?.name||ROLES[r];
     const A=[];
     if(due) A.push({t:`حصّل متأخرات ${short(due)} من ${lateC} مستأجر`,s:ag[3]?`منها ${short(ag[3])} تجاوزت 90 يوماً وتحتاج إجراءً نظامياً.`:`أقدمها منذ ${oldest} يوماً.`,w:who('finance'),tone:'bad',go:'units',box:'#clBox',f:{fState:'over'}});
-    if(dueToday.length) A.push({t:`${dueToday.length} قسط يستحق خلال 7 أيام بقيمة ${short(sum(dueToday,'amount'))}`,s:'ذكّر المستأجرين قبل الاستحقاق.',w:who('finance'),tone:'warn',go:'units',box:'#clBox',f:{fSoon:'soon'}});
+    if(dueToday.length) A.push({t:`${dueToday.length} إيجار سنوي يستحق خلال 30 يوماً بقيمة ${short(sum(dueToday,'amount'))}`,s:'ذكّر المستأجرين قبل موعد الدفعة السنوية.',w:who('finance'),tone:'warn',go:'units',box:'#clBox',f:{fSoon:'soon'}});
     if(vac.length-rehab.length) A.push({t:`سوّق ${vac.length-rehab.length} وحدة شاغرة جاهزة للتأجير`,s:`كل شهر شغور يضيّع ${short(sum(vac.filter(u=>!rehab.includes(u)),'rent')/12)}.`,w:who('manager'),tone:'warn',go:'units',box:'#occBox',f:{occupancy:'شاغر'}});
     if(rehab.length) A.push({t:`أهّل ${rehab.length} وحدة متعطلة عن التأجير بسبب حالتها`,s:'لا تُؤجَّر قبل تأهيلها.',w:who('engineer'),tone:'warn',go:'units',box:'#occBox',f:{occupancy:'شاغر',condition:'يحتاج صيانة'}});
     if(ending.length) A.push({t:`جدّد ${ending.length} عقد إيجار ينتهي خلال 90 يوماً`,s:`أقربها ${ending.sort((x,y)=>x.e.localeCompare(y.e))[0].e}.`,w:who('manager'),tone:'warn',go:'units',box:'#clBox',f:{fEnd:'end'}});
     if(obs.overdue) A.push({t:`${obs.overdue} ملاحظة على المقاولين تجاوزت موعد إغلاقها`,s:`المفتوح الآن ${obs.open}.`,w:who('engineer'),tone:'bad',go:'ops'});
     nextPay.filter(x=>daysTo(x.d)<=30).forEach(x=>A.push({t:`سدّد ${short(x.amt)} للهيئة الملكية عن ${x.n}`,s:`يستحق في ${x.d}.`,w:who('finance'),tone:'warn',go:'sag'}));
     est.forEach(x=>A.push({t:`سجّل التكاليف الفعلية لـ${assetPlain(x.k.assetId)}`,s:'تكاليفه الآن تقديرية بمرجع مشروع آخر.',w:who('finance'),tone:'info',go:'sag'}));
-    { const cm=curMo(), mos=[...Array(12)].map((_,i)=>addMo(cm,i-11)); // بيانات الرسوم
+    { const cm=curMo(), mos=[...Array(14)].map((_,i)=>addMo(cm,i-11)); // 12 شهراً مضت وشهران قادمان // بيانات الرسوم
       QAC={B:B.slice().sort((x,y)=>x.occ-y.occ),mos,due:mos.map(m=>sum(selfPays.filter(p=>(p.dueDate||'').startsWith(m)),'amount')),paid:mos.map(m=>selfPays.filter(p=>(p.dueDate||'').startsWith(m)).reduce((a,p)=>a+Math.min(Number(p.paid)||0,Number(p.amount)||0),0)),ag,PL:PL.map(x=>({l:assetPlain(x.k.assetId),exp:x.exp,pay:x.pay,profit:x.profit}))}; }
     /* المستأجرون المتأخرون: الأقدم تأخراً أولاً */
     const lateL=C.map(c=>{ const P=paysOfClient(c.id).filter(p=>p.dueDate&&p.dueDate<t&&(Number(p.amount)||0)>(Number(p.paid)||0)); if(!P.length) return null; const u=Store.get('assets',c.assetId); return {c,u,n:P.length,over:P.reduce((a,p)=>a+(Number(p.amount)||0)-(Number(p.paid)||0),0),days:-daysTo(P[0].dueDate),since:P[0].dueDate}; }).filter(Boolean).sort((x,y)=>y.days-x.days||y.over-x.over);
-    const lateTbl=lateL.length?`<div class="twrap" style="margin-top:6px"><table class="tbl ltb"><thead><tr><th>المستأجر</th><th>الشقة</th><th>الجوال</th><th>المتأخر</th><th>منذ</th></tr></thead><tbody>${lateL.slice(0,8).map(x=>`<tr class="clk" data-cl="${x.c.id}"><td><b>${esc(x.c.name)}</b>${x.c.status==='متعثر'?' <span class="pill bad">متعثر</span>':''}</td><td>${esc(x.u?.name||'—')}<div class="small muted">${esc(x.u?assetPlain(x.u.parentId):'')} · ${esc(x.u?assetPlain(agreementFor(x.u.id)?.assetId):'')}</div></td><td class="num">${esc(x.c.phone||'—')}</td><td><b class="neg">${N(x.over)}</b><div class="small muted">${x.n===1?'قسط واحد':x.n===2?'قسطان':x.n+' أقساط'}</div></td><td><span class="pill ${x.days>90?'bad':'warn'}">${x.days} يوماً</span><div class="small muted num">${x.since}</div></td></tr>`).join('')}</tbody></table></div>
+    const lateTbl=lateL.length?`<div class="twrap" style="margin-top:6px"><table class="tbl ltb"><thead><tr><th>المستأجر</th><th>الشقة</th><th>الجوال</th><th>المتأخر</th><th>منذ</th></tr></thead><tbody>${lateL.slice(0,8).map(x=>`<tr class="clk" data-cl="${x.c.id}"><td><b>${esc(x.c.name)}</b>${x.c.status==='متعثر'?' <span class="pill bad">متعثر</span>':''}</td><td>${esc(x.u?.name||'—')}<div class="small muted">${esc(x.u?assetPlain(x.u.parentId):'')} · ${esc(x.u?assetPlain(agreementFor(x.u.id)?.assetId):'')}</div></td><td class="num">${esc(x.c.phone||'—')}</td><td><b class="neg">${N(x.over)}</b><div class="small muted">${x.n===1?'دفعة سنوية':x.n===2?'دفعتان سنويتان':x.n+' دفعات سنوية'}</div></td><td><span class="pill ${x.days>90?'bad':'warn'}">${x.days} يوماً</span><div class="small muted num">${x.since}</div></td></tr>`).join('')}</tbody></table></div>
       <div class="small" style="margin-top:8px">${lateL.length>8?`يُعرض أقدم 8 من ${lateL.length}. `:''}<a href="#" data-tab="units" data-box="#clBox" data-f="${esc(JSON.stringify({fState:'over'}))}">عرض كل المتأخرين في جدول المستأجرين</a> · اضغط أي مستأجر لفتح ملفه ودفعاته.</div>`:'<div class="empty">لا يوجد مستأجرون متأخرون.</div>';
     const row=(q,a,n)=>`<div class="qar"><span>${q}</span><b>${a}</b>${n?`<small>${n}</small>`:''}</div>`;
     return `<div class="card mb ddec"><h3>المطلوب اليوم <span class="small muted">الإجراء والمسؤول عنه</span></h3>${A.length?A.map((x,i)=>`<a class="drow ${x.tone}" href="#" data-tab="${x.go}" data-box="${x.box||''}" data-f="${esc(JSON.stringify(x.f||{}))}"><span class="dn">${i+1}</span><div class="dt"><b>${esc(x.t)}</b><div class="small muted">${esc(x.s)}</div></div><div class="damt"><small>المسؤول</small><b style="font-size:15px">${esc(x.w)}</b></div><span class="dgo">←</span></a>`).join(''):'<div class="empty">لا إجراءات مطلوبة اليوم.</div>'}</div>
     <div class="card mb"><div class="dah"><h3>الرسوم البيانية</h3><span class="small muted">الصورة كاملة في أربع نظرات</span></div><div class="dfin">
       <div class="dfc"><div class="dft">الدخل أين يذهب في كل مشروع <span>سنوياً</span></div><div class="chart" style="height:260px"><canvas id="qcP"></canvas></div></div>
-      <div class="dfc"><div class="dft">المستحق والمحصّل شهرياً <span>آخر 12 شهراً</span></div><div class="chart" style="height:260px"><canvas id="qcC"></canvas></div></div>
-      <div class="dfc"><div class="dft">متأخرات المستأجرين حسب مدة التأخير <span>أقساط إيجار حلّ موعدها ولم تُسدد</span></div><div class="chart" style="height:220px"><canvas id="qcA"></canvas></div><div class="dft" style="margin-top:6px">من هم المتأخرون <span>${lateL.length} مستأجر</span></div>${lateTbl}</div>
+      <div class="dfc"><div class="dft">المستحق والمحصّل حسب شهر الاستحقاق <span>الإيجار يُحصَّل سنوياً مقدماً، فيتركز في أشهر بداية العقود</span></div><div class="chart" style="height:260px"><canvas id="qcC"></canvas></div></div>
+      <div class="dfc"><div class="dft">متأخرات المستأجرين حسب مدة التأخير <span>إيجارات سنوية حلّ موعدها ولم تُسدد كاملة</span></div><div class="chart" style="height:220px"><canvas id="qcA"></canvas></div><div class="dft" style="margin-top:6px">من هم المتأخرون <span>${lateL.length} مستأجر</span></div>${lateTbl}</div>
       <div class="dfc"><div class="dft">إشغال كل مبنى <span>من الأضعف إلى الأقوى</span></div><div class="chart" style="height:${Math.max(260,B.length*24)}px"><canvas id="qcB"></canvas></div></div>
     </div></div>
     <div class="grid g2 mb">
@@ -1187,7 +1185,7 @@ M.operations={key:'operations',label:'التشغيل الذاتي',icon:'🏠',g
       {k:'fNext',label:'الدفعة القادمة',fmt:r=>{const n=clientFin(r).next;return n?`<span class="num">${n.dueDate}</span> · ${num((Number(n.amount)||0)-(Number(n.paid)||0))}`:'—';},plain:r=>clientFin(r).next?.dueDate||''},
       {k:'fBar',label:'نسبة السداد',fmt:r=>finBar(clientFin(r)),plain:r=>clientFin(r).pct},{k:'status',label:'الحالة',fmt:r=>pill(r.status)}],
     filters:[{k:'fState',label:'السداد',options:[{v:'over',l:'عليه متأخرات'},{v:'ok',l:'منتظم'}],get:r=>clientFin(r).overdue>0?'over':'ok'},
-      {k:'fSoon',label:'الأقساط القادمة',options:[{v:'soon',l:'قسط يستحق خلال 7 أيام'}],get:r=>{ const n=clientFin(r).next; return n&&daysTo(n.dueDate)<=7?'soon':''; }},
+      {k:'fSoon',label:'الدفعة السنوية القادمة',options:[{v:'soon',l:'تستحق خلال 30 يوماً'}],get:r=>{ const n=clientFin(r).next; return n&&daysTo(n.dueDate)<=30?'soon':''; }},
       {k:'fEnd',label:'نهاية العقد',options:[{v:'end',l:'ينتهي خلال 90 يوماً'}],get:r=>{ const d=r.leaseEnd?daysTo(r.leaseEnd):null; return d!=null&&d>=0&&d<=90?'end':''; }}],
     where:c=>uid.has(c.assetId)||!c.assetId,
     fields:[{k:'name',label:'الاسم',required:true},{k:'idNo',label:'رقم الهوية'},{k:'phone',label:'الجوال'},{k:'email',label:'البريد',type:'email'},{k:'kind',label:'النوع',type:'select',options:['مستأجر','مالك','مستثمر','جهة حكومية'],default:'مستأجر'},{k:'assetId',label:'الوحدة',type:'select',options:assetOpts},{k:'status',label:'الحالة',type:'select',options:['نشط','منتهي','متعثر'],default:'نشط'},{k:'notes',label:'ملاحظات',type:'textarea',full:true}]},$('#clBox',v));
