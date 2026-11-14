@@ -85,11 +85,18 @@ const assetVal=id=>{ const kids=new Map(); Store.coll('assets').forEach(a=>{ if(
 /* مرجع التكاليف: تكلفة الوحدة السنوية في مشروع التشغيل الذاتي الأكثر تسجيلاً للتكاليف (حالياً فلل العزيزة). يُستخدم لتقدير تكاليف أي مشروع لم تُسجَّل تكاليفه */
 let _crMemo=null;
 const costRef=()=>{ const key=(Store.data._ts||0)+':'+Store.coll('finance').length+':'+Store.coll('assets').length; if(_crMemo&&_crMemo.key===key) return _crMemo.v;
-  let best=null; Store.coll('contracts').filter(k=>k.type==='تشغيل ذاتي').forEach(k=>{ const F=Store.coll('finance').filter(f=>f.kind==='مصروف'&&f.contractId===k.id), tot=sum(F,'amount'); if(tot>0&&(!best||tot>best.tot)) best={k,F,tot}; });
+  let best=null; Store.coll('contracts').filter(k=>k.type==='تشغيل ذاتي').forEach(k=>{ const F=Store.coll('finance').filter(f=>f.kind==='مصروف'&&f.contractId===k.id&&f.category!=='تكلفة إخلاء'), tot=sum(F,'amount'); if(tot>0&&(!best||tot>best.tot)) best={k,F,tot}; });
   let v=null; if(best){ const ids=new Set(descendants(best.k.assetId).map(x=>x.id)), nu=Store.coll('assets').filter(u=>u.level==='unit'&&ids.has(u.id)).length; if(nu){ const cats={}; best.F.forEach(f=>{ const c=String(f.category||'أخرى').replace(/\s*\(.*\)/,''); cats[c]=(cats[c]||0)+Number(f.amount); });
       v={kid:best.k.id,name:assetPlain(best.k.assetId),units:nu,perUnit:best.tot/nu,cats:Object.entries(cats).map(([c,a])=>[c,a/nu]).sort((x,y)=>y[1]-x[1])}; } }
   _crMemo={key,v}; return v; };
-const agreementPL=k=>{ const F=Store.coll('finance').filter(f=>(f.contractId||agreementFor(f.assetId)?.id)===k.id); let rev=sum(F.filter(f=>f.kind==='إيراد'),'amount'); let exp=sum(F.filter(f=>f.kind==='مصروف'),'amount'), expEst=false;
+/* موظف الإشغال: راتبه السنوي يُوزَّع على مشاريع التشغيل الذاتي بنسبة عدد وحداتها */
+let _suMemo=null;
+const selfUnitMap=()=>{ const key=Store.coll('assets').length+':'+Store.coll('contracts').length+':'+(Store.data._ts||0); if(_suMemo&&_suMemo.key===key) return _suMemo.v; const m={}; let tot=0;
+  Store.coll('contracts').filter(k=>k.type==='تشغيل ذاتي'&&AG_LIVE(k)).forEach(k=>{ const ids=new Set([k.assetId,...descendants(k.assetId).map(x=>x.id)]), n=Store.coll('assets').filter(u=>u.level==='unit'&&ids.has(u.id)).length; m[k.id]=n; tot+=n; }); _suMemo={key,v:{m,tot}}; return _suMemo.v; };
+const staffAnnual=()=>(Number(Store.data.settings.staffMonthly)||0)*12;
+const staffShare=k=>{ if(k.type!=='تشغيل ذاتي') return 0; const S=selfUnitMap(); return S.tot&&S.m[k.id]?staffAnnual()*S.m[k.id]/S.tot:0; };
+const VAC_CAT='تكلفة إخلاء';
+const agreementPL=k=>{ const F=Store.coll('finance').filter(f=>(f.contractId||agreementFor(f.assetId)?.id)===k.id); let rev=sum(F.filter(f=>f.kind==='إيراد'),'amount'); const oneOff=sum(F.filter(f=>f.kind==='مصروف'&&f.category===VAC_CAT),'amount'); let exp=sum(F.filter(f=>f.kind==='مصروف'),'amount')-oneOff, expEst=false;
   if(k.type!=='مستثمر'&&!exp){ const ids0=new Set([k.assetId,...descendants(k.assetId).map(x=>x.id)]), nu=Store.coll('assets').filter(u=>u.level==='unit'&&ids0.has(u.id)).length;
     if(nu&&(k.opsPerUnit!=null&&k.opsPerUnit!==''||k.omLinkId)){ // خطة التكاليف المدخلة عند إنشاء المشروع: تشغيل الوحدة + عقد الصيانة (الخاص أو المربوط)
       const own=sum(Store.coll('contracts').filter(x=>x.type==='تشغيل وصيانة'&&ids0.has(x.assetId)),'value'), L=k.omLinkId&&Store.get('contracts',k.omLinkId);
@@ -97,8 +104,9 @@ const agreementPL=k=>{ const F=Store.coll('finance').filter(f=>(f.contractId||ag
       exp=Math.round((Number(k.opsPerUnit)||0)*nu+own+linked); expEst=exp?'plan':false; }
     else { const R=costRef(); if(R&&R.kid!==k.id&&nu){ exp=Math.round(R.perUnit*nu); expEst='ref'; } } } let pay=Number(k.payToAuthority)||0, due=Number(k.payFromInvestor)||0, revEst=false;
   if(k.type!=='مستثمر'&&!F.some(f=>f.kind==='إيراد')){ const set=new Set([k.assetId,...descendants(k.assetId).map(x=>x.id)]); const rr=sum(Store.coll('assets').filter(u=>u.level==='unit'&&set.has(u.id)&&u.occupancy==='مشغول'),'rent'); if(rr){ rev=rr; revEst=true; } }
+  const staff=staffShare(k); exp+=oneOff+staff;
   const inv=k.type==='مستثمر', plan={pay,due,profit:inv?due-pay:rev-exp-pay}; const live=AG_LIVE(k); if(!live){ pay=0; due=0; }
-  const profit=inv?due-pay:rev-exp-pay; return {rev,exp,pay,due,profit,margin:pct(profit,inv?due:rev),live,plan,revEst,expEst}; };
+  const profit=inv?due-pay:rev-exp-pay; return {rev,exp,pay,due,profit,margin:pct(profit,inv?due:rev),live,plan,revEst,expEst,staff,oneOff}; };
 /* قراءات تشغيلية لكل اتفاقية: الأصول والوحدات تحتها، الإشغال، المتأخرات */
 const agreementOps=k=>{ const set=new Set([k.assetId,...descendants(k.assetId).map(x=>x.id)]); const units=Store.coll('assets').filter(x=>x.level==='unit'&&set.has(x.id)); const occ=units.filter(u=>u.occupancy==='مشغول').length;
   const overdue=finOf(Store.coll('payments').filter(p=>set.has(p.assetId))).overdue;
@@ -349,14 +357,15 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
   const payCell=x=>x.k.payToAuthority===''||x.k.payToAuthority==null?'<span class="pill warn">غير محدد</span>':num(x.pay);
   const months=[...new Set(F.map(f=>f.date.slice(0,7)))].sort().slice(-12), kOf=f=>Store.get('contracts',f.contractId||agreementFor(f.assetId)?.id||'')?.type;
   const mS=(kind,type)=>months.map(mo=>sum(F.filter(f=>f.kind===kind&&kOf(f)===type&&f.date.startsWith(mo)),'amount'));
-  const mSelfRev=mS('إيراد','تشغيل ذاتي'), mSelfExp=mS('مصروف','تشغيل ذاتي'), mInvRev=mS('إيراد','مستثمر');
+  const mSelfRev=mS('إيراد','تشغيل ذاتي'), mSelfExp=mS('مصروف','تشغيل ذاتي').map(x=>x+(self.some(y=>y.live)?staffAnnual()/12:0)), mInvRev=mS('إيراد','مستثمر');
   const ending=inv.filter(x=>x.daysLeft!=null&&x.daysLeft<=90), R=Store.coll('requirements').filter(r=>inv.some(x=>x.k.id===r.contractId)), rq=reqStats(R);
   const obs=obsStats(Store.coll('observations').filter(o=>omContracts().some(k=>k.id===o.contractId)));
   const share=x=>PM.profit>0?`يساهم بـ${per(x,PM.profit)}% من ربح المحفظة`:'';
   /* بيانات التحليل المالي */
   const fin=(()=>{ const liveSelf=self.filter(x=>x.live), cats={}; Store.coll('finance').filter(f=>f.kind==='مصروف'&&liveSelf.some(x=>x.k.id===(f.contractId||agreementFor(f.assetId)?.id))).forEach(f=>{ const c=String(f.category||'أخرى').replace(/\s*\(.*\)/,''); cats[c]=(cats[c]||0)+Number(f.amount); });
     /* المشاريع التي لا قيود لتكاليفها تدخل بتكلفتها التقديرية (خطة المشروع أو مرجع التكاليف)، حتى يطابق الشلال صافي الربح */
-    liveSelf.filter(x=>x.expEst).forEach(x=>{ const c=`تكاليف تقديرية: ${assetPlain(x.k.assetId)}`; cats[c]=(cats[c]||0)+x.exp; });
+    liveSelf.filter(x=>x.expEst).forEach(x=>{ const c=`تكاليف تقديرية: ${assetPlain(x.k.assetId)}`; cats[c]=(cats[c]||0)+x.exp-x.staff-x.oneOff; });
+    { const st=sum(liveSelf,'staff'); if(st) cats['موظف الإشغال']=(cats['موظف الإشغال']||0)+st; const oo=sum(liveSelf.filter(x=>x.expEst),'oneOff'); if(oo) cats['تكلفة إخلاء']=(cats['تكلفة إخلاء']||0)+oo; }
     const catList=Object.entries(cats).sort((a,b)=>b[1]-a[1]), pay=PM.pay, profit=PM.profit, top=catList[0];
     const proj=all.filter(x=>x.live).map(x=>{ const inc=x.k.type==='مستثمر'?x.due:x.rev; return {l:assetPlain(x.k.assetId),inc,cost:x.k.type==='مستثمر'?0:x.exp,pay:x.pay,profit:x.profit,margin:inc?x.profit/inc*100:0,units:x.units,occ:x.occ,inv:x.k.type==='مستثمر'}; });
     const ue=proj.filter(p=>p.occ).map(p=>({l:p.l,inc:p.inc/p.occ/12,cost:p.cost/p.occ/12,pay:p.pay/p.occ/12,net:p.profit/p.occ/12}));
@@ -557,7 +566,8 @@ function leaseUnit(a,done){
 }
 function vacateUnit(a,done){
   const c=a.tenantId&&Store.get('clients',a.tenantId), today=todayStr(), P=paysOfAsset(a.id).filter(p=>!c||p.clientId===c.id);
-  Modal.open({title:`إخلاء ${esc(a.name)}`,body:`<div class="form"><div class="f"><label>تاريخ الإخلاء</label><input id="vcD" type="date" value="${today}"></div></div>
+  Modal.open({title:`إخلاء ${esc(a.name)}`,body:`<div class="form"><div class="f"><label>تاريخ الإخلاء</label><input id="vcD" type="date" value="${today}"></div><div class="f"><label>تكلفة الإخلاء (ر.س)</label><input id="vcC" type="number" min="0" value="${Store.data.settings.vacateCost??3000}"></div></div>
+    <p class="small muted" style="margin-top:8px">تكلفة الإخلاء (تنظيف ودهان وإصلاحات التسليم) تُسجَّل مصروفاً على المشروع في المالية.</p>
     <p class="small muted" style="margin-top:8px">${c?`المستأجر: <b>${esc(c.name)}</b>. `:''}الدفعات السنوية غير المسددة التي يحل موعدها بعد تاريخ الإخلاء تُحذف لأنها لم تعد مستحقة. الدفعات السابقة غير المسددة تبقى متأخرات على المستأجر حتى تُحصَّل.</p><div class="small" id="vcSum" style="margin-top:6px"></div>`,
     footer:`<button class="btn" onclick="Modal.close()">إلغاء</button><button class="btn d" id="vcOk">إخلاء</button>`});
   const sumUp=()=>{ const d=$('#vcD').value, fut=P.filter(p=>p.dueDate>d&&!(Number(p.paid)>0)), owed=P.filter(p=>p.dueDate<=d).reduce((t,p)=>t+Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0)),0);
@@ -567,6 +577,7 @@ function vacateUnit(a,done){
     Store.data.payments=Store.coll('payments').filter(p=>!drop.has(p.id));
     if(c) Store.update('clients',c.id,{status:'منتهي',leaseEnd:d});
     Store.update('assets',a.id,{occupancy:'شاغر',status:'شاغر',tenantId:'',vacantSince:d});
+    const vc=Math.max(0,Number($('#vcC').value)||0); if(vc) Store.coll('finance').push({id:Store.gen('FN','finance'),date:d,kind:'مصروف',category:VAC_CAT,assetId:a.id,contractId:agreementFor(a.id)?.id||'',amount:vc,ref:`إخلاء ${a.name}`,createdAt:now(),createdBy:App.user.id});
     Store.log('إخلاء','assets',a.id,`إخلاء ${a.name}${c?' من '+c.name:''} بتاريخ ${d}، حُذف ${drop.size} دفعة قادمة`); Store.save();
     Modal.close(); toast(`أُخليت ${a.name}`); done&&done(); };
 }
@@ -1154,7 +1165,7 @@ M.operations={key:'operations',label:'التشغيل الذاتي',icon:'🏠',g
         ${row('ملاحظات مفتوحة على المقاولين',obs.open,obs.overdue?`${obs.overdue} تجاوزت موعد المعالجة`:'لا شيء متأخر')}
         ${row('وحدات متعطلة بسبب الصيانة',rehab.length,rehab.length?'شاغرة وحالتها تحتاج تأهيلاً':'لا يوجد')}</div>
       <div class="card qa"><h3>مرجع التكاليف <span class="small muted">${R?`من ${esc(R.name)} · ${R.units} وحدة`:''}</span></h3>
-        ${R?R.cats.map(([c,a])=>row(esc(c),`${N(a)} ر.س`,`للوحدة سنوياً · ${N(a/12)} شهرياً`)).join('')+`<div class="qar tot"><span>إجمالي تكلفة الوحدة</span><b>${N(R.perUnit)} ر.س</b><small>سنوياً · ${N(R.perUnit/12)} شهرياً. يُطبَّق على أي مشروع لم تُسجَّل تكاليفه.</small></div>`:'<div class="empty">لا توجد تكاليف مسجلة لأي مشروع بعد.</div>'}</div>
+        ${R?R.cats.map(([c,a])=>row(esc(c),`${N(a)} ر.س`,`للوحدة سنوياً · ${N(a/12)} شهرياً`)).join('')+`${staffAnnual()&&units.length?row('موظف الإشغال',`${N(staffAnnual()/units.length)} ر.س`,`للوحدة سنوياً · راتب ${N(staffAnnual()/12)} شهرياً موزع على ${units.length} وحدة تشغيل ذاتي`):''}<div class="qar tot"><span>إجمالي تكلفة الوحدة</span><b>${N(R.perUnit+(units.length?staffAnnual()/units.length:0))} ر.س</b><small>سنوياً · ${N((R.perUnit+(units.length?staffAnnual()/units.length:0))/12)} شهرياً. يُطبَّق على أي مشروع لم تُسجَّل تكاليفه. تكلفة الإخلاء (${N(Store.data.settings.vacateCost??3000)} ر.س) تُضاف عند كل إخلاء.</small></div>`:'<div class="empty">لا توجد تكاليف مسجلة لأي مشروع بعد.</div>'}</div>
     </div>`; })();
   v.innerHTML=`<div class="pagehead self"><div><h3>🏠 التشغيل الذاتي <span class="en">Self-Operation</span></h3><p class="small muted">ندفع للهيئة الملكية ونتولى التأجير والتحصيل والتشغيل بأنفسنا.</p></div><div class="phx">${can('edit')?'<button class="btn p sm" data-np="self">＋ إضافة مشروع</button>':''}</div></div>
   <div class="sumline mb"><div><span>المشاريع</span><b>${nP}</b></div><div><span>الوحدات</span><b>${units.length}</b><small>في ${bld.length} مبنى</small></div><div><span>الإشغال</span><b>${pct(occ.length,units.length)}%</b><small>${occ.length} مؤجرة</small></div><div><span>المحصّل</span><b>${short(allF.paid)}</b><small>من ${short(allF.total)}</small></div><div class="${due?'bad':''}"><span>متأخرات</span><b>${short(due)}</b><small>${lateC?`على ${lateC} مستأجر`:'لا يوجد'}</small></div></div>
@@ -1365,7 +1376,7 @@ function agreementCF(k,months){
   const OM=Store.coll('contracts').filter(x=>x.type==='تشغيل وصيانة'&&agreementFor(x.assetId)?.id===k.id);
   const MT=Store.coll('meters').filter(m=>meterAg(m)?.id===k.id&&m.payer!=='المستأجر'), MB=Store.coll('meterBills').filter(b=>MT.some(m=>m.id===b.meterId));
   const isOm=f=>f.category==='عقد تشغيل وصيانة', isMt=f=>String(f.category||'').startsWith('فاتورة');
-  const actual=mo=>{ const E=F.filter(f=>f.date.startsWith(mo)); return {self:self?sum(E.filter(f=>f.kind==='إيراد'),'amount'):0,inv:self?0:sum(E.filter(f=>f.kind==='إيراد'),'amount'),auth:AG_LIVE(k)?sched(k.payToAuthority,k.period,k.start,k.end,mo):0,om:sum(E.filter(f=>f.kind==='مصروف'&&isOm(f)),'amount'),meters:sum(MB.filter(b=>b.period===mo),'amount'),other:sum(E.filter(f=>f.kind==='مصروف'&&!isOm(f)&&!isMt(f)),'amount')}; };
+  const actual=mo=>{ const E=F.filter(f=>f.date.startsWith(mo)); return {self:self?sum(E.filter(f=>f.kind==='إيراد'),'amount'):0,inv:self?0:sum(E.filter(f=>f.kind==='إيراد'),'amount'),auth:AG_LIVE(k)?sched(k.payToAuthority,k.period,k.start,k.end,mo):0,om:sum(E.filter(f=>f.kind==='مصروف'&&isOm(f)),'amount'),meters:sum(MB.filter(b=>b.period===mo),'amount'),other:sum(E.filter(f=>f.kind==='مصروف'&&!isOm(f)&&!isMt(f)),'amount')+staffShare(k)/12}; };
   const last6=[0,1,2,3,4,5].map(i=>addMo(cur,-i)).map(actual), avg=key=>last6.reduce((s,x)=>s+x[key],0)/6;
   const mAvg=(()=>{ const per=[...new Set(MB.map(b=>b.period))].sort().slice(-6); return per.length?sum(MB.filter(b=>per.includes(b.period)),'amount')/per.length:0; })();
   const run={self:avg('self'),other:avg('other')};
@@ -1445,7 +1456,7 @@ const WI_FD=[
   {id:'qRamp',g:'q',s:'الوصول للإشغال',min:0,max:60,l:'كم شهراً يحتاج حتى يصل لهذا الإشغال؟',u:'شهر',def:v=>v.qReady==='yes'?6:12},
   {id:'qCond',g:'q',s:'حالة الأصل',l:'ما حالة الأصل؟',opts:WI_COND,def:()=>'mid'},
   {id:'qReady',g:'q',s:'جاهز للتأجير',l:'هل الأصل جاهز للتأجير الآن؟',opts:WI_YN,def:()=>'no'},
-  {id:'maint',g:'q',per:12,s:'صيانة الوحدة شهرياً',min:0,l:'كم تكلفة الصيانة الشهرية للوحدة الواحدة؟',u:'ر.س شهرياً',def:v=>WI_COND[v.qCond].maint,src:()=>'مرجع تقريبي حسب حالة الأصل',hint:'تشمل عقد الصيانة الوقائية والإصلاحات وقطع الغيار'},
+  {id:'maint',g:'q',per:12,s:'صيانة الوحدة شهرياً',min:0,l:'كم تكلفة الصيانة الشهرية للوحدة الواحدة؟',u:'ر.س شهرياً',def:v=>{ const R=costRef(), m=R&&R.cats.find(c=>/صيانة/.test(c[0])); return m?Math.round(m[1]/12)*12:WI_COND[v.qCond].maint; },src:()=>costRef()?`من عقد صيانة ${costRef().name}`:'مرجع تقريبي حسب حالة الأصل',hint:'تشمل عقد الصيانة الوقائية والإصلاحات وقطع الغيار'},
   {id:'util',g:'q',per:12,s:'عدادات الوحدة شهرياً',min:0,l:'كم تكلفة العدادات (كهرباء ومياه) الشهرية للوحدة في التشغيل الذاتي؟',u:'ر.س شهرياً',def:()=>1800,src:()=>'مرجع تقريبي',hint:'ما تدفعه أنت: المناطق المشتركة والإنارة والوحدات الشاغرة. صفر إن كان المستأجر يدفع كل شيء'},
   {id:'opsU',g:'q',per:12,s:'تشغيل الوحدة شهرياً',min:0,l:'كم تكلفة عملية التشغيل الشهرية للوحدة؟',u:'ر.س شهرياً',def:v=>v.qUnits>=100?3000:v.qUnits>=40?4020:5520,src:()=>'مرجع تقريبي حسب حجم المشروع',hint:'رواتب فريق التأجير والتحصيل، الحراسة، النظافة، الإدارة والأنظمة والتأمين'},
   {id:'qTeam',g:'جاهزية التشغيل الذاتي',s:'فريق التشغيل',l:'جاهزية فريقك للتأجير والتشغيل والتحصيل',hint:'تؤثر على نسبة التحصيل وعلاوة مخاطر التشغيل الذاتي',opts:WI_TEAM,def:()=>'part'},
@@ -1851,7 +1862,7 @@ M.alerts={key:'alerts',label:'التنبيهات',icon:'🔔',group:'الرئي�
 
 /* الإعدادات */
 M.system={key:'system',label:'الإعدادات والنسخ',icon:'⚙️',group:'متقدم',render(v){
-  v.innerHTML=`<div class="grid g2"><div class="card"><h3>بيانات النظام</h3><div class="form"><div class="f"><label>اسم المشروع</label><input id="pn" value="${esc(Store.data.settings.projectName)}"></div><div class="f"><label>العملة</label><input id="cur" value="${esc(Store.data.settings.currency)}"></div></div><button class="btn p" id="sv" style="margin-top:12px">حفظ</button></div>
+  v.innerHTML=`<div class="grid g2"><div class="card"><h3>بيانات النظام</h3><div class="form"><div class="f"><label>اسم المشروع</label><input id="pn" value="${esc(Store.data.settings.projectName)}"></div><div class="f"><label>العملة</label><input id="cur" value="${esc(Store.data.settings.currency)}"></div></div><div class="form" style="margin-top:12px"><div class="f"><label>راتب موظف الإشغال الشهري (ر.س)</label><input id="stf" type="number" min="0" value="${Store.data.settings.staffMonthly||0}"></div><div class="f"><label>تكلفة إخلاء الوحدة (ر.س)</label><input id="vcs" type="number" min="0" value="${Store.data.settings.vacateCost??3000}"></div></div><div class="small muted" style="margin-top:6px">راتب موظف الإشغال يُوزَّع على وحدات مشاريع التشغيل الذاتي ويُحسب ضمن تكاليفها. تكلفة الإخلاء تُقترح عند كل إخلاء.</div><button class="btn p" id="sv" style="margin-top:12px">حفظ</button></div>
   <div class="card"><h3>النسخ الاحتياطي والبيانات</h3><p class="small muted">البيانات محفوظة محلياً في هذا المتصفح. صدّر نسخة احتياطية بانتظام، وعند الرفع للإنتاج ننقلها إلى قاعدة بيانات سحابية.</p><div class="toolbar" style="margin-top:12px"><button class="btn ${IN_FRAME?'hidden':''}" id="ex">⬇ تصدير JSON</button><label class="btn">⬆ استيراد JSON<input type="file" id="im" accept=".json" class="hidden"></label><button class="btn d" id="rs">↺ إعادة البيانات التجريبية</button></div>
   <div class="small muted" style="margin-top:10px">السجلات: ${['assets','contracts','documents','finance','clients','payments','audit'].map(c=>`${c} ${Store.coll(c).length}`).join(' · ')}</div>
   <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px"><b>الحفظ السحابي</b>
@@ -1859,7 +1870,7 @@ M.system={key:'system',label:'الإعدادات والنسخ',icon:'⚙️',gro
       :`<div class="small muted">غير مفعّل على هذا الجهاز: البيانات محفوظة في هذا المتصفح فقط. الصق الرابط الخاص هنا لتفعيله.</div><div class="toolbar" style="margin-top:8px"><input id="clIn" placeholder="الصق الرابط الخاص" dir="ltr" style="max-width:360px"><button class="btn sm p" id="clOn">تفعيل</button></div>`}</div>
   <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px"><b>النسخ التلقائية اليومية</b><div class="small muted">تؤخذ نسخة من بياناتك أول مرة تفتح النظام كل يوم، ويُحتفظ بآخر 5 أيام. تحديثات النظام لا تمس بياناتك.</div>
     ${Store.snapshots().map(x=>`<div class="nprow" style="padding:8px 0"><span class="num">${x.day} · ${x.kb} ك.ب</span><button class="btn sm" data-rs="${x.day}">استرجاع</button></div>`).join('')||'<div class="small muted" style="margin-top:6px">لا توجد نسخ بعد.</div>'}</div></div></div>`;
-  $('#sv',v).onclick=()=>{ Store.data.settings.projectName=$('#pn',v).value; Store.data.settings.currency=$('#cur',v).value; Store.save(); toast('تم الحفظ'); };
+  $('#sv',v).onclick=()=>{ Store.data.settings.projectName=$('#pn',v).value; Store.data.settings.currency=$('#cur',v).value; Store.data.settings.staffMonthly=Math.max(0,Number($('#stf',v).value)||0); Store.data.settings.vacateCost=Math.max(0,Number($('#vcs',v).value)||0); Store.save(); toast('تم الحفظ'); };
   $('#ex',v).onclick=()=>Store.export(); $('#im',v).onchange=e=>e.target.files[0]&&Store.import(e.target.files[0]);
   if($('#clCopy',v)) $('#clCopy',v).onclick=()=>{ const L=Cloud.link(); (navigator.clipboard?navigator.clipboard.writeText(L):Promise.reject()).then(()=>toast('نُسخ الرابط')).catch(()=>Modal.open({title:'الرابط الخاص',body:`<textarea readonly dir="ltr" style="width:100%;height:90px">${L}</textarea>`,footer:'<button class="btn" onclick="Modal.close()">إغلاق</button>'})); };
   if($('#clOff',v)) $('#clOff',v).onclick=()=>ask('سيتوقف هذا الجهاز عن الحفظ السحابي، وتبقى نسخته المحلية. البيانات على السيرفر لا تُحذف.',()=>{ try{ localStorage.removeItem('am_cloud_key'); }catch(e){} location.reload(); },'إيقاف');
