@@ -570,3 +570,9 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .dfin{align-items:start}
 
 .ltb td{vertical-align:top;font-size:13.5px} .ltb b.neg{color:var(--red)}
+
+/* نقطة التعادل في بطاقة المشروع */
+.agbw{position:relative} .agbw u{position:absolute;top:-5px;bottom:-5px;width:3px;border-radius:2px;background:var(--text);transform:translateX(50%)}
+.agbe{display:flex;flex-direction:column;gap:2px;padding:9px 12px;border-radius:10px;font-size:13.5px;line-height:1.6;background:var(--amber-bg);color:var(--amber)}
+.agbe b{font-size:15px} .agbe small{display:block;font-size:12px;opacity:.85}
+.agbe.ok{background:var(--ok-bg);color:var(--ok)} .agbe.bad{background:var(--red-bg);color:var(--red)}

@@ -712,6 +712,8 @@ function agCard(k){ const p0=agreementPL(k), p=p0.live?p0:Object.assign({},p0,p0
   const span=k.start&&k.end?Math.max(1,(new Date(k.end)-new Date(k.start))/86400000):0, used=span?Math.min(100,Math.max(0,Math.round((new Date(todayStr())-new Date(k.start))/86400000/span*100))):0;
   const inc=inv?p.due:p.rev, cost=inv?0:p.exp, tot=Math.max(inc,cost+p.pay,1), w=x=>Math.max(0,x)/tot*100, nb=descendants(k.assetId).filter(a=>a.level==='building').length;
   const noAuth=k.payToAuthority===''||k.payToAuthority==null, ids=new Set([k.assetId,...descendants(k.assetId).map(x=>x.id)]), lateN=Store.coll('clients').filter(c=>ids.has(c.assetId)&&clientFin(c).overdue>0).length;
+  /* نقطة التعادل: كم شقة مؤجرة تغطي تكاليف التشغيل والهيئة الملكية، بمتوسط إيجار شقق المشروع */
+  const BE=(()=>{ if(inv||!o.units) return null; const U=Store.coll('assets').filter(u=>u.level==='unit'&&ids.has(u.id)&&Number(u.rent)>0); if(!U.length) return null; const avg=sum(U,'rent')/U.length, cost=p.exp+p.pay; return cost>0?{avg,cost,need:Math.ceil(cost/avg)}:null; })();
   const N=[]; // تنبيهات البطاقة: الأهم أولاً
   if(!p0.live) N.push(['warn',`العقد ${k.status}: الأرقام متوقعة، ولا تدخل في الإجماليات حتى يصبح «ساري».`]);
   if(d!=null&&d<=90) N.push(['bad',d<0?`انتهى العقد منذ ${-d} يوماً.`:`العقد ينتهي خلال ${d} يوماً: قرّر التجديد.`]);
@@ -729,7 +731,8 @@ function agCard(k){ const p0=agreementPL(k), p=p0.live?p0:Object.assign({},p0,p0
     ${inc?`<div class="dflow" role="img" aria-label="توزيع الدخل"><i class="c" style="width:${w(cost)}%"></i><i class="a" style="width:${w(p.pay)}%"></i><i class="p" style="width:${w(p.profit)}%"></i></div>
     <div class="agl">${inv?'':`<span><i class="c"></i>تكاليف ${short(cost)}</span>`}<span><i class="a"></i>الهيئة الملكية ${noAuth?'غير محدد':short(p.pay)}</span><span><i class="p"></i>ربح ${short(p.profit)}</span></div>`:''}
     ${inv?`<div class="ago"><span>المحصّل من المستثمر</span><div class="bar gold"><i style="width:${Math.min(100,pct(p.rev,p.due))}%"></i></div><b>${pct(p.rev,p.due)}%</b></div>`
-        :`<div class="ago"><span>الإشغال</span><div class="bar ${o.occPct<75?'red':''}"><i style="width:${o.occPct}%"></i></div><b>${o.occ} من ${o.units}</b></div>`}
+        :`<div class="ago"><span>الإشغال</span><div class="agbw"><div class="bar ${BE&&o.occ<BE.need?'red':''}"><i style="width:${o.occPct}%"></i></div>${BE&&BE.need<=o.units?`<u style="inset-inline-start:${Math.min(100,BE.need/o.units*100)}%" title="نقطة التعادل"></u>`:''}</div><b>${o.occ} من ${o.units}</b></div>
+        ${BE?`<div class="agbe ${BE.need>o.units?'bad':o.occ>=BE.need?'ok':'warn'}"><b>نقطة التعادل: ${BE.need>o.units?'غير ممكنة بهذه الإيجارات':`${BE.need} شقة مؤجرة من ${o.units}`}</b><span>${BE.need>o.units?`حتى بإشغال كامل لا يغطي الدخل التكاليف. يلزم رفع متوسط الإيجار إلى ${Math.ceil(BE.cost/o.units).toLocaleString('en-US')} ر.س أو خفض التكاليف.`:o.occ>=BE.need?`تجاوزتها بـ${o.occ-BE.need===0?'صفر: أنت عندها تماماً':(o.occ-BE.need)+' شقة'}، وكل شقة إضافية ربح صافٍ.`:`ينقصك تأجير ${BE.need-o.occ===1?'شقة واحدة':BE.need-o.occ===2?'شقتين':(BE.need-o.occ)+' شقق'} لتغطي التكاليف.`} <small>التكاليف والهيئة ${short(BE.cost)} ÷ متوسط الإيجار ${Math.round(BE.avg).toLocaleString('en-US')}</small></span></div>`:''}`}
     <div class="agn2">${N.length?N.slice(0,3).map(([t,x])=>`<div class="${t}">${t==='bad'?'●':t==='warn'?'▲':'ℹ'} ${esc(x)}</div>`).join(''):'<div class="ok">✓ لا ملاحظات على هذا المشروع.</div>'}</div>
     <details class="agmore"><summary>تفاصيل أكثر</summary>
       <div class="mk">
