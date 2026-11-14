@@ -70,7 +70,7 @@ const clientName=id=>Store.get('clients',id)?.name||id||'—';
 const LEVELS={project:'مشروع',district:'حي',building:'مبنى',unit:'وحدة',equipment:'معدات'};
 const LEVEL_ORDER=['project','district','building','unit','equipment'];
 const MODEL={investor:'إسناد التشغيل لمستثمر',self:'تشغيل ذاتي',mixed:'مختلط'};
-const STATUS_CLASS=s=>{ s=String(s||''); if(/مكتمل|ساري|نشط|معتمد|يعمل|مغلق|ممتاز|مشغول|مؤجر/.test(s)) return 'ok'; if(/قيد|مجدول|مراجعة|مقدم|مقبول|تحت|محوّل|مسودة/.test(s)) return 'warn'; if(/متوقف|منتهي|مرفوض|يحتاج|عالية|عالي|مفتوح|شاغر|متأخر/.test(s)) return 'bad'; return ''; };
+const STATUS_CLASS=s=>{ s=String(s||''); if(/غير سليمة/.test(s)) return 'bad'; if(/مكتمل|ساري|نشط|معتمد|يعمل|مغلق|ممتاز|مشغول|مؤجر|سليمة/.test(s)) return 'ok'; if(/قيد|مجدول|مراجعة|مقدم|مقبول|تحت|محوّل|مسودة|ملاحظات/.test(s)) return 'warn'; if(/متوقف|منتهي|مرفوض|يحتاج|عالية|عالي|مفتوح|شاغر|متأخر/.test(s)) return 'bad'; return ''; };
 const pill=s=>`<span class="pill ${STATUS_CLASS(s)}">${esc(s||'—')}</span>`;
 const COLORS=['#16242f','#b9925a','#a9713d','#5b8aa8','#8c6c9c','#c25a4a','#6aa884','#d4a574'];
 const descendants=id=>{ const out=[]; const walk=p=>Store.coll('assets').filter(a=>a.parentId===p).forEach(a=>{ out.push(a); walk(a.id); }); walk(id); return out; };
@@ -477,7 +477,58 @@ M.agreements={key:'agreements',label:'الاتفاقيات والتشغيل',ico
 }};
 
 /* 3. سجل الأصول (شجرة + جدول + تفاصيل + QR) */
-const AssetView={mode:'agreement',ag:'',open:null};
+const AssetView={mode:'agreement',ag:'',open:null,tab:''};
+/* ───── تقرير حالة الوحدات وسلامتها: يرفعه المشغّل ملف Excel فتتحدث الوحدات مباشرة ───── */
+const UR_COND=['ممتاز','جيد','مقبول','يحتاج صيانة'], UR_SAFE=['سليمة','عليها ملاحظات','غير سليمة'];
+const UR_COLS=['رمز الوحدة','العمارة','الوحدة','الحالة الفنية','السلامة','تاريخ الفحص','ملاحظات'];
+const UR_DAYS=90; // التقرير مطلوب كل 3 أشهر
+const xlsxLib=()=>window.XLSX?Promise.resolve(window.XLSX):new Promise((ok,no)=>{ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; sc.onload=()=>ok(window.XLSX); sc.onerror=()=>no(new Error('تعذر تحميل مكتبة Excel. تحقق من الاتصال.')); document.head.appendChild(sc); });
+const urUnits=k=>{ const ids=new Set(descendants(k.assetId).map(x=>x.id)); return Store.coll('assets').filter(u=>u.level==='unit'&&ids.has(u.id)); };
+const urNorm=x=>String(x??'').trim().replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/\s+/g,' ');
+const urPick=(val,list,alias)=>{ const n=urNorm(val); if(!n) return ''; const hit=list.find(o=>urNorm(o)===n); if(hit) return hit; const a=alias&&Object.keys(alias).find(key=>urNorm(key)===n); return a?alias[a]:null; };
+const urDate=x=>{ if(x instanceof Date&&!isNaN(x)) return new Date(x.getTime()+12*3600000).toISOString().slice(0,10); const t=String(x??'').trim(); if(!t) return ''; let m=t.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/); if(m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`; m=t.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/); if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; return null; };
+async function urBook(k){ const X=await xlsxLib(), U=urUnits(k).sort((a,b)=>String(a.code).localeCompare(String(b.code),'en',{numeric:true}));
+  const rows=[UR_COLS,...U.map(u=>[u.code,assetPlain(u.parentId),u.name,'','','',''])], ws=X.utils.aoa_to_sheet(rows); ws['!cols']=[{wch:22},{wch:16},{wch:14},{wch:16},{wch:16},{wch:14},{wch:44}];
+  const help=X.utils.aoa_to_sheet([['تعليمات تعبئة تقرير حالة الوحدات وسلامتها'],[],['المشروع',assetPlain(k.assetId)],['الاتفاقية',k.number],[],['1','لا تغيّر الأعمدة الثلاثة الأولى (رمز الوحدة، العمارة، الوحدة). الربط يتم برمز الوحدة.'],['2','عمود «الحالة الفنية»: اكتب واحدة من: '+UR_COND.join(' / ')],['3','عمود «السلامة»: اكتب واحدة من: '+UR_SAFE.join(' / ')],['4','عمود «تاريخ الفحص»: بصيغة 2026-11-14. إن تُرك فارغاً يُعتمد تاريخ الرفع.'],['5','عمود «ملاحظات»: إلزامي إذا كانت الحالة «يحتاج صيانة» أو السلامة «عليها ملاحظات» أو «غير سليمة». اذكر المشكلة بوضوح.'],['6','الصف الذي تُترك حالته وسلامته فارغتين لا يُحدَّث.'],['7','يُرفع التقرير كل 3 أشهر من: سجل الأصول ← حالة الوحدات وسلامتها ← رفع التقرير.']]); help['!cols']=[{wch:10},{wch:95}];
+  const wb=X.utils.book_new(); wb.Workbook={Views:[{RTL:true}]}; X.utils.book_append_sheet(wb,ws,'حالة الوحدات'); X.utils.book_append_sheet(wb,help,'التعليمات'); return {X,wb,name:`قالب-حالة-الوحدات-${assetPlain(k.assetId).replace(/\s+/g,'-')}.xlsx`}; }
+async function urTemplate(k){ try{ const b=await urBook(k); b.X.writeFile(b.wb,b.name); }catch(e){ toast(e.message); } }
+async function urParse(k,buf){ const X=await xlsxLib(), wb=X.read(buf,{cellDates:true}), ws=wb.Sheets[wb.SheetNames.find(n=>n==='حالة الوحدات')||wb.SheetNames[0]], R=X.utils.sheet_to_json(ws,{header:1,defval:'',raw:true});
+  const hi=R.findIndex(r=>r.some(c=>urNorm(c)===urNorm('رمز الوحدة'))); if(hi<0) throw new Error('الملف لا يطابق القالب: لم أجد عمود «رمز الوحدة». نزّل القالب وعبّئه.');
+  const H=R[hi].map(urNorm), col=n=>H.indexOf(urNorm(n)), cC=col('رمز الوحدة'), cK=col('الحالة الفنية'), cS=col('السلامة'), cD=col('تاريخ الفحص'), cN=col('ملاحظات'); if(cK<0||cS<0) throw new Error('الملف لا يطابق القالب: عمود «الحالة الفنية» أو «السلامة» غير موجود.');
+  const U=urUnits(k), byCode=new Map(U.map(u=>[String(u.code).trim().toUpperCase(),u])), ok=[], bad=[], seen=new Set();
+  R.slice(hi+1).forEach((r,i)=>{ const line=hi+i+2, code=String(r[cC]??'').trim(); if(!code) return; const cond=urPick(r[cK],UR_COND,{'ممتازه':'ممتاز','جيده':'جيد','مقبوله':'مقبول','تحتاج صيانه':'يحتاج صيانة','صيانه':'يحتاج صيانة'}), safe=urPick(r[cS],UR_SAFE,{'سليم':'سليمة','غير سليم':'غير سليمة','ملاحظات':'عليها ملاحظات','عليه ملاحظات':'عليها ملاحظات'}), note=String(cN>=0?r[cN]??'':'').trim(), dt=cD>=0?urDate(r[cD]):'';
+    if(cond===''&&safe==='') return; const u=byCode.get(code.toUpperCase()), E=[];
+    if(!u) E.push('رمز الوحدة غير موجود في هذا المشروع'); if(seen.has(code.toUpperCase())) E.push('الرمز مكرر في الملف'); seen.add(code.toUpperCase());
+    if(cond===null) E.push(`الحالة الفنية «${r[cK]}» غير معروفة`); else if(cond==='') E.push('الحالة الفنية فارغة'); if(safe===null) E.push(`السلامة «${r[cS]}» غير معروفة`); else if(safe==='') E.push('السلامة فارغة');
+    if(dt===null) E.push(`تاريخ الفحص «${r[cD]}» غير مفهوم`); else if(dt&&dt>todayStr()) E.push('تاريخ الفحص في المستقبل');
+    if(!E.length&&(cond==='يحتاج صيانة'||safe!=='سليمة')&&!note) E.push('الملاحظات إلزامية لأن الوحدة تحتاج صيانة أو عليها ملاحظة سلامة');
+    E.length?bad.push({line,code,E}):ok.push({u,cond,safe,dt:dt||todayStr(),note}); });
+  return {U,ok,bad}; }
+function urApply(k,P,fileName){ const unsafe=P.ok.filter(x=>x.safe==='غير سليمة').length, need=P.ok.filter(x=>x.cond==='يحتاج صيانة').length;
+  P.ok.forEach(x=>Object.assign(x.u,{condition:x.cond,safety:x.safe,inspectedOn:x.dt,inspNote:x.note,inspReport:todayStr()}));
+  Store.coll('unitReports').unshift({id:'UR-'+Date.now(),contractId:k.id,date:todayStr(),file:fileName,units:P.U.length,updated:P.ok.length,unsafe,need,errors:P.bad.length,by:App.user?.id||''});
+  Store.log('تعديل','assets',k.assetId,`تقرير حالة الوحدات (${fileName}): تحديث ${P.ok.length} وحدة، غير سليمة ${unsafe}، تحتاج صيانة ${need}`); Store.save(); }
+async function urUpload(k,file,done){ try{ const P=await urParse(k,await file.arrayBuffer()), {U,ok,bad}=P;
+    const miss=U.length-ok.length, unsafe=ok.filter(x=>x.safe==='غير سليمة').length, need=ok.filter(x=>x.cond==='يحتاج صيانة').length;
+    Modal.open({title:`مراجعة التقرير: ${esc(assetPlain(k.assetId))}`,body:`<div class="npsum"><div class="nprow"><span>الملف</span><b>${esc(file.name)}</b></div><div class="nprow"><span>وحدات ستُحدَّث</span><b>${ok.length} من ${U.length}</b></div>${miss>0?`<div class="nprow"><span>وحدات لم يشملها التقرير</span><b>${miss}</b></div>`:''}<div class="nprow"><span>غير سليمة</span><b class="${unsafe?'neg':''}">${unsafe}</b></div><div class="nprow"><span>تحتاج صيانة</span><b>${need}</b></div><div class="nprow"><span>صفوف فيها أخطاء (لن تُحدَّث)</span><b class="${bad.length?'neg':''}">${bad.length}</b></div></div>
+      ${bad.length?`<div class="twrap" style="max-height:220px;overflow:auto;margin-top:10px"><table class="tbl"><thead><tr><th>الصف</th><th>الرمز</th><th>الخطأ</th></tr></thead><tbody>${bad.slice(0,100).map(b=>`<tr><td>${b.line}</td><td>${esc(b.code)}</td><td>${esc(b.E.join('، '))}</td></tr>`).join('')}</tbody></table></div><p class="small muted" style="margin-top:6px">صحّح هذه الصفوف في الملف وأعد رفعه، أو اعتمد الصفوف السليمة الآن.</p>`:''}`,
+      footer:`<button class="btn" onclick="Modal.close()">إلغاء</button>${ok.length?`<button class="btn p" id="urGo">اعتماد وتحديث ${ok.length} وحدة</button>`:''}`});
+    if($('#urGo')) $('#urGo').onclick=()=>{ urApply(k,P,file.name); Modal.close(); toast(`حُدِّثت ${ok.length} وحدة`); done&&done(); };
+  }catch(e){ Modal.open({title:'تعذر قراءة الملف',body:`<p>${esc(e.message)}</p>`,footer:`<button class="btn p" onclick="Modal.close()">إغلاق</button>`}); } }
+function renderUnitCond(c,refresh){ const st=AssetView, K=opAgreements();
+  const rows=K.map(k=>{ const U=urUnits(k), last=Store.coll('unitReports').find(r=>r.contractId===k.id), age=last?-daysTo(last.date):null;
+    return {k,U,rep:U.filter(u=>u.safety).length,unsafe:U.filter(u=>u.safety==='غير سليمة').length,notes:U.filter(u=>u.safety==='عليها ملاحظات').length,need:U.filter(u=>u.safety&&u.condition==='يحتاج صيانة').length,last,late:!last||age>UR_DAYS}; });
+  const all=rows.flatMap(r=>r.U), flag=all.filter(u=>u.safety&&(u.safety!=='سليمة'||u.condition==='يحتاج صيانة')).sort((a,b)=>(b.safety==='غير سليمة')-(a.safety==='غير سليمة'));
+  const who=k=>k.type==='مستثمر'?`المستثمر: ${k.party||'—'}`:'فريق التشغيل الذاتي', cnt=f=>all.filter(f).length;
+  c.innerHTML=`<div class="sumline mb"><div><span>الوحدات</span><b>${all.length}</b></div><div><span>وصل عنها تقرير</span><b>${pct(cnt(u=>u.safety),all.length)}%</b><small>${cnt(u=>u.safety)} وحدة</small></div><div><span>غير سليمة</span><b class="${cnt(u=>u.safety==='غير سليمة')?'neg':''}">${cnt(u=>u.safety==='غير سليمة')}</b></div><div><span>عليها ملاحظات</span><b>${cnt(u=>u.safety==='عليها ملاحظات')}</b></div><div><span>تحتاج صيانة</span><b>${cnt(u=>u.safety&&u.condition==='يحتاج صيانة')}</b></div></div>
+  <div class="card mb"><h3>تقارير المشغّلين <span class="small muted">كل مشغّل ملزم برفع تقرير حالة وحداته وسلامتها كل 3 أشهر</span></h3><div class="twrap"><table class="tbl"><thead><tr><th>المشروع</th><th>المسؤول عن التقرير</th><th>الوحدات</th><th>شملها التقرير</th><th>غير سليمة</th><th>عليها ملاحظات</th><th>تحتاج صيانة</th><th>آخر تقرير</th><th></th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td><b>${esc(assetPlain(r.k.assetId))}</b><div class="small muted">${agPill(r.k)}</div></td><td>${esc(who(r.k))}</td><td>${r.U.length}</td><td>${r.rep} <span class="small muted">(${pct(r.rep,r.U.length)}%)</span></td><td class="${r.unsafe?'neg':''}"><b>${r.unsafe}</b></td><td>${r.notes}</td><td>${r.need}</td><td>${r.last?`${r.last.date} ${r.late?'<span class="pill bad">متأخر</span>':'<span class="pill ok">محدّث</span>'}`:'<span class="pill bad">لم يُرفع</span>'}</td><td style="white-space:nowrap"><button class="btn sm" data-tpl="${r.k.id}">⬇ قالب Excel</button> ${can('edit')?`<button class="btn sm p" data-up="${r.k.id}">⬆ رفع التقرير</button>`:''}</td></tr>`).join('')||'<tr><td colspan="9" class="muted">لا توجد مشاريع.</td></tr>'}
+  </tbody></table></div><input type="file" id="urF" accept=".xlsx,.xls" style="display:none"><p class="small muted" style="margin-top:8px">نزّل القالب (فيه وحدات المشروع جاهزة)، أرسله للمشغّل ليعبّئ الحالة والسلامة، ثم ارفعه هنا. يُراجَع الملف قبل الاعتماد، ولا يُحدَّث أي صف فيه خطأ.</p></div>
+  <div class="card"><h3>وحدات تحتاج متابعة <span class="small muted">${flag.length}</span></h3>${flag.length?`<div class="twrap"><table class="tbl"><thead><tr><th>الوحدة</th><th>المشروع</th><th>السلامة</th><th>الحالة الفنية</th><th>الملاحظة</th><th>تاريخ الفحص</th></tr></thead><tbody>${flag.slice(0,200).map(u=>`<tr class="clk" data-u="${u.id}"><td><b>${esc(u.name)}</b><div class="small muted">${esc(u.code)}</div></td><td>${esc(assetPlain(agreementFor(u.id)?.assetId))}</td><td>${pill(u.safety)}</td><td>${pill(u.condition)}</td><td>${esc(u.inspNote||'')}</td><td class="num">${u.inspectedOn||'—'}</td></tr>`).join('')}</tbody></table></div>`:`<p class="small muted">${all.some(u=>u.safety)?'كل الوحدات التي وصل عنها تقرير سليمة ولا تحتاج صيانة.':'لم يُرفع أي تقرير بعد.'}</p>`}</div>`;
+  c.querySelectorAll('[data-tpl]').forEach(b=>b.onclick=()=>urTemplate(Store.get('contracts',b.dataset.tpl)));
+  let target=null; const inp=$('#urF',c); c.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{ target=Store.get('contracts',b.dataset.up); inp.value=''; inp.click(); });
+  inp.onchange=()=>{ if(inp.files[0]&&target) urUpload(target,inp.files[0],()=>{ st.tab='cond'; refresh(); }); };
+  c.querySelectorAll('[data-u]').forEach(r=>r.onclick=()=>assetDetail(Store.get('assets',r.dataset.u))); }
 M.assets={key:'assets',label:'سجل الأصول',icon:'🏗️',group:'الأساسي',render(v){
   const A=Store.coll('assets'); const st=AssetView;
   const grp=t=>A.filter(x=>(agreementFor(x.id)?.type||'none')===t);
@@ -485,15 +536,16 @@ M.assets={key:'assets',label:'سجل الأصول',icon:'🏗️',group:'الأ�
     return `<div class="card kpi agc ${st.ag===t?'sel':''}" data-ag="${t}" style="--kc:${color}"><div class="l">${icon} ${label}${t!=='none'?` · ${ks.length} اتفاقية`:''}</div><div class="v">${units.length} <span class="small muted">وحدة</span></div><div class="s">${nb} مبنى${units.length&&t==='تشغيل ذاتي'?` · إشغال ${pct(occ,units.length)}%`:''}${val?` · القيمة ${short(val)}`:''}</div></div>`; };
   v.innerHTML=`<div class="grid g3 mb">${card('تشغيل ذاتي','التشغيل الذاتي <span class="en">Self-Operation</span>','🏠','var(--wood)')}${card('مستثمر','إسناد التشغيل لمستثمر <span class="en">Investor-Operated</span>','🤝','var(--sky)')}${card('none','غير مرتبط باتفاقية','⚪','var(--muted)')}</div>
     ${st.ag?`<div class="toolbar"><span class="pill ${st.ag==='مستثمر'?'info':st.ag==='none'?'':'gold'}">عرض: ${st.ag==='none'?'غير مرتبط':AG_LABEL[st.ag]}</span><button class="btn sm" id="clrAg">✕ عرض الكل</button></div>`:''}
-    <div class="tabs"><button class="active" data-t="tree">هيكل الأصول</button><button data-t="table">الجدول</button></div><div id="aTree"></div><div id="aTable" class="hidden"></div>`;
+    <div class="tabs"><button class="${st.tab==='cond'?'':'active'}" data-t="tree">هيكل الأصول</button><button data-t="table">الجدول</button><button class="${st.tab==='cond'?'active':''}" data-t="cond">حالة الوحدات وسلامتها</button></div><div id="aTree" class="${st.tab==='cond'?'hidden':''}"></div><div id="aTable" class="hidden"></div><div id="aCond" class="${st.tab==='cond'?'':'hidden'}"></div>`;
   v.querySelectorAll('[data-ag]').forEach(c=>c.onclick=()=>{ st.ag=st.ag===c.dataset.ag?'':c.dataset.ag; M.assets.render(v); });
   const clr=$('#clrAg',v); if(clr) clr.onclick=()=>{ st.ag=''; M.assets.render(v); };
-  v.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{ v.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); $('#aTree',v).classList.toggle('hidden',b.dataset.t!=='tree'); $('#aTable',v).classList.toggle('hidden',b.dataset.t!=='table'); });
+  v.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{ v.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); $('#aTree',v).classList.toggle('hidden',b.dataset.t!=='tree'); $('#aTable',v).classList.toggle('hidden',b.dataset.t!=='table'); $('#aCond',v).classList.toggle('hidden',b.dataset.t!=='cond'); st.tab=b.dataset.t; });
+  renderUnitCond($('#aCond',v),()=>M.assets.render(v));
   renderTree($('#aTree',v));
   crud(assetCrudCfg(st.ag?(x=>(agreementFor(x.id)?.type||'none')===st.ag):undefined),$('#aTable',v));
 }};
 function assetCrudCfg(where){ return {coll:'assets',title:'أصل',where,
-  columns:[{k:'code',label:'الرمز'},{k:'name',label:'الاسم'},{k:'level',label:'المستوى',fmt:r=>pill(LEVELS[r.level]),plain:r=>LEVELS[r.level]},{k:'type',label:'النوع'},{k:'parentId',label:'يتبع لـ',fmt:r=>assetPlain(r.parentId),plain:r=>assetPlain(r.parentId)},{k:'location',label:'الموقع'},{k:'area',label:'المساحة م²',fmt:r=>num(r.area)},{k:'value',label:'القيمة',fmt:r=>money(r.value)},{k:'condition',label:'الحالة الفنية',fmt:r=>pill(r.condition)},{k:'status',label:'الحالة',fmt:r=>pill(r.status)},{k:'agreement',label:'الاتفاقية',fmt:r=>agPill(agreementFor(r.id)),plain:r=>agPlain(agreementFor(r.id))}],
+  columns:[{k:'code',label:'الرمز'},{k:'name',label:'الاسم'},{k:'level',label:'المستوى',fmt:r=>pill(LEVELS[r.level]),plain:r=>LEVELS[r.level]},{k:'type',label:'النوع'},{k:'parentId',label:'يتبع لـ',fmt:r=>assetPlain(r.parentId),plain:r=>assetPlain(r.parentId)},{k:'location',label:'الموقع'},{k:'area',label:'المساحة م²',fmt:r=>num(r.area)},{k:'value',label:'القيمة',fmt:r=>money(r.value)},{k:'condition',label:'الحالة الفنية',fmt:r=>pill(r.condition)},{k:'safety',label:'السلامة',fmt:r=>r.safety?pill(r.safety):'<span class="muted">—</span>'},{k:'inspectedOn',label:'آخر فحص'},{k:'status',label:'الحالة',fmt:r=>pill(r.status)},{k:'agreement',label:'الاتفاقية',fmt:r=>agPill(agreementFor(r.id)),plain:r=>agPlain(agreementFor(r.id))}],
   filters:[{k:'level',label:'المستوى',options:LEVEL_ORDER.map(l=>({v:l,l:LEVELS[l]}))},{k:'condition',label:'الحالة',options:['ممتاز','جيد','مقبول','يحتاج صيانة']},...AG_FILTERS],
   fields:assetFields(), detail:assetDetail}; }
 function assetFields(){ return [
@@ -502,6 +554,7 @@ function assetFields(){ return [
   {k:'parentId',label:'يتبع لـ (الأصل الأب)',type:'select',options:()=>Store.coll('assets').filter(a=>a.level!=='equipment').map(a=>({v:a.id,l:`${LEVELS[a.level]}: ${a.name}`}))},
   {k:'type',label:'النوع'},{k:'location',label:'الموقع'},{k:'area',label:'المساحة م²',type:'number'},{k:'ownership',label:'الملكية',default:'مخصص'},
   {k:'value',label:'القيمة (ر.س)',type:'number'},{k:'condition',label:'الحالة الفنية',type:'select',options:['ممتاز','جيد','مقبول','يحتاج صيانة'],default:'جيد'},
+  {k:'safety',label:'السلامة',type:'select',options:UR_SAFE},{k:'inspectedOn',label:'تاريخ آخر فحص',type:'date'},{k:'inspNote',label:'ملاحظات الفحص'},
   {k:'status',label:'الحالة',type:'select',options:['قيد التشغيل','مؤجر','شاغر','يعمل','متوقف','تحت الإنشاء','مستبعد'],default:'قيد التشغيل'},
   {k:'occupancy',label:'الإشغال (للوحدات)',type:'select',options:['مشغول','شاغر']},{k:'rent',label:'الإيجار السنوي',type:'number'},
   {k:'tenantId',label:'المستأجر',type:'select',options:()=>Store.coll('clients').map(c=>({v:c.id,l:c.name}))},
