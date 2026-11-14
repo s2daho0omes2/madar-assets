@@ -1089,7 +1089,8 @@ M.operations={key:'operations',label:'التشغيل الذاتي',icon:'🏠',g
     const B=bld.map(b=>{ const u=units.filter(x=>x.parentId===b.id), o=u.filter(x=>x.occupancy==='مشغول'), ids=new Set(u.map(x=>x.id)); return {n:`${b.name} (${assetPlain(b.parentId)})`,u:u.length,o:o.length,occ:pct(o.length,u.length),rent:o.length?sum(o,'rent')/o.length:0,over:finOf(selfPays.filter(p=>ids.has(p.assetId))).overdue}; }).filter(x=>x.u);
     const BR=B.filter(x=>x.o).sort((x,y)=>y.rent-x.rent), sameRent=BR.length&&Math.round(BR[0].rent)===Math.round(BR[BR.length-1].rent);
     const score=x=>x.occ-(x.over?Math.min(40,x.over/Math.max(1,x.rent*x.o)*100):0), BS=B.slice().sort((x,y)=>score(y)-score(x));
-    const vs=vac.filter(u=>u.vacantSince).map(u=>-daysTo(u.vacantSince)).filter(x=>x>=0);
+    /* مدة الشغور: من تاريخ الإخلاء المسجل، وإن لم يُسجَّل فمن بداية اتفاقية المشروع (افتراض) */
+    const vsAll=vac.map(u=>{ const since=u.vacantSince||agreementFor(u.id)?.start; return since?{d:Math.max(0,-daysTo(since)),real:!!u.vacantSince}:null; }).filter(Boolean), vs=vsAll.map(x=>x.d), vsReal=vsAll.filter(x=>x.real).length, vsMax=vs.length?Math.max(...vs):0;
     const C=Store.coll('clients').filter(c=>uid.has(c.assetId)&&c.status!=='منتهي'), endOf=c=>{ if(c.leaseEnd) return c.leaseEnd; const P=paysOfClient(c.id); if(P.length<2) return null; const gap=Math.max(1,Math.round((new Date(P[1].dueDate)-new Date(P[0].dueDate))/2629800000)), d=new Date(P[P.length-1].dueDate); d.setMonth(d.getMonth()+gap); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); };
     const ending=C.map(c=>({c,e:endOf(c)})).filter(x=>x.e&&daysTo(x.e)<=90&&daysTo(x.e)>=0);
     const dueP=selfPays.filter(p=>p.dueDate&&p.dueDate<=t), dueAmt=sum(dueP,'amount'), paid=dueP.reduce((a,p)=>a+Math.min(Number(p.paid)||0,Number(p.amount)||0),0);
@@ -1115,7 +1116,7 @@ M.operations={key:'operations',label:'التشغيل الذاتي',icon:'🏠',g
         ${row('إجمالي الوحدات',units.length,`في ${bld.length} مبنى و${SK.length} مشروع`)}${row('المؤجرة / الشاغرة',`${occ.length} / ${vac.length}`,`نسبة الإشغال ${pct(occ.length,units.length)}%`)}
         ${row('الشاغرة الجاهزة للتأجير',vac.length-rehab.length,rehab.length?`و${rehab.length} تحتاج تأهيلاً قبل التأجير`:'لا توجد وحدات تحتاج تأهيلاً')}
         ${row('الإيراد المفقود بسبب الشواغر',short(loss),`سنوياً، أي ${short(loss/12)} شهرياً`)}
-        ${row('متوسط مدة بقاء الوحدة شاغرة',vs.length?`${Math.round(vs.reduce((a,x)=>a+x,0)/vs.length)} يوماً`:'غير متوفر',vs.length?`محسوب من ${vs.length} وحدة سُجّل إخلاؤها`:'يبدأ القياس من أول إخلاء يُسجَّل بزر «إخلاء الوحدة»')}</div>
+        ${row('متوسط مدة بقاء الوحدة شاغرة',vs.length?`${Math.round(vs.reduce((a,x)=>a+x,0)/vs.length)} يوماً`:'لا شواغر',vs.length?`أطولها ${vsMax} يوماً. ${vsReal===vs.length?'من تواريخ الإخلاء المسجلة':vsReal?`${vsReal} من تاريخ إخلاء مسجل، والباقي مفترض منذ بداية اتفاقية المشروع`:'مفترضة منذ بداية اتفاقية كل مشروع، وتصير فعلية مع كل إخلاء يُسجَّل'}`:'')}</div>
       <div class="card qa"><h3>الإيجارات والعقود</h3>
         ${row('متوسط الإيجار السنوي للوحدة المؤجرة',`${N(avgRent)} ر.س`,`${N(avgRent/12)} شهرياً`)}
         ${row('أعلى مبنى في متوسط الإيجار',BR.length?(sameRent?'متساوية':esc(BR[0].n)):'—',BR.length?(sameRent?'كل المباني بنفس متوسط الإيجار':`${N(BR[0].rent)} ر.س`):'')}
