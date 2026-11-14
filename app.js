@@ -82,10 +82,23 @@ const AG_LIVE=k=>!/مسودة|ملغي/.test(String(k.status||''));
 /* قيمة الأصل: قيمته المسجلة، وإن لم تُسجل فمجموع قيم ما تحته */
 const assetVal=id=>{ const kids=new Map(); Store.coll('assets').forEach(a=>{ if(a.parentId){ if(!kids.has(a.parentId)) kids.set(a.parentId,[]); kids.get(a.parentId).push(a); } });
   const val=x=>{ const v=Number(x.value)||0; return v||(kids.get(x.id)||[]).reduce((t,c)=>t+val(c),0); }; const a=Store.get('assets',id); return a?val(a):0; };
-const agreementPL=k=>{ const F=Store.coll('finance').filter(f=>(f.contractId||agreementFor(f.assetId)?.id)===k.id); let rev=sum(F.filter(f=>f.kind==='إيراد'),'amount'); const exp=sum(F.filter(f=>f.kind==='مصروف'),'amount'); let pay=Number(k.payToAuthority)||0, due=Number(k.payFromInvestor)||0, revEst=false;
+/* مرجع التكاليف: تكلفة الوحدة السنوية في مشروع التشغيل الذاتي الأكثر تسجيلاً للتكاليف (حالياً فلل العزيزة). يُستخدم لتقدير تكاليف أي مشروع لم تُسجَّل تكاليفه */
+let _crMemo=null;
+const costRef=()=>{ const key=(Store.data._ts||0)+':'+Store.coll('finance').length+':'+Store.coll('assets').length; if(_crMemo&&_crMemo.key===key) return _crMemo.v;
+  let best=null; Store.coll('contracts').filter(k=>k.type==='تشغيل ذاتي').forEach(k=>{ const F=Store.coll('finance').filter(f=>f.kind==='مصروف'&&f.contractId===k.id), tot=sum(F,'amount'); if(tot>0&&(!best||tot>best.tot)) best={k,F,tot}; });
+  let v=null; if(best){ const ids=new Set(descendants(best.k.assetId).map(x=>x.id)), nu=Store.coll('assets').filter(u=>u.level==='unit'&&ids.has(u.id)).length; if(nu){ const cats={}; best.F.forEach(f=>{ const c=String(f.category||'أخرى').replace(/\s*\(.*\)/,''); cats[c]=(cats[c]||0)+Number(f.amount); });
+      v={kid:best.k.id,name:assetPlain(best.k.assetId),units:nu,perUnit:best.tot/nu,cats:Object.entries(cats).map(([c,a])=>[c,a/nu]).sort((x,y)=>y[1]-x[1])}; } }
+  _crMemo={key,v}; return v; };
+const agreementPL=k=>{ const F=Store.coll('finance').filter(f=>(f.contractId||agreementFor(f.assetId)?.id)===k.id); let rev=sum(F.filter(f=>f.kind==='إيراد'),'amount'); let exp=sum(F.filter(f=>f.kind==='مصروف'),'amount'), expEst=false;
+  if(k.type!=='مستثمر'&&!exp){ const ids0=new Set([k.assetId,...descendants(k.assetId).map(x=>x.id)]), nu=Store.coll('assets').filter(u=>u.level==='unit'&&ids0.has(u.id)).length;
+    if(nu&&(k.opsPerUnit!=null&&k.opsPerUnit!==''||k.omLinkId)){ // خطة التكاليف المدخلة عند إنشاء المشروع: تشغيل الوحدة + عقد الصيانة (الخاص أو المربوط)
+      const own=sum(Store.coll('contracts').filter(x=>x.type==='تشغيل وصيانة'&&ids0.has(x.assetId)),'value'), L=k.omLinkId&&Store.get('contracts',k.omLinkId);
+      let linked=0; if(L){ const li=new Set([L.assetId,...descendants(L.assetId).map(x=>x.id)]), lu=Store.coll('assets').filter(u=>u.level==='unit'&&li.has(u.id)).length; linked=lu?(Number(L.value)||0)/lu*nu:0; }
+      exp=Math.round((Number(k.opsPerUnit)||0)*nu+own+linked); expEst=exp?'plan':false; }
+    else { const R=costRef(); if(R&&R.kid!==k.id&&nu){ exp=Math.round(R.perUnit*nu); expEst='ref'; } } } let pay=Number(k.payToAuthority)||0, due=Number(k.payFromInvestor)||0, revEst=false;
   if(k.type!=='مستثمر'&&!F.some(f=>f.kind==='إيراد')){ const set=new Set([k.assetId,...descendants(k.assetId).map(x=>x.id)]); const rr=sum(Store.coll('assets').filter(u=>u.level==='unit'&&set.has(u.id)&&u.occupancy==='مشغول'),'rent'); if(rr){ rev=rr; revEst=true; } }
   const inv=k.type==='مستثمر', plan={pay,due,profit:inv?due-pay:rev-exp-pay}; const live=AG_LIVE(k); if(!live){ pay=0; due=0; }
-  const profit=inv?due-pay:rev-exp-pay; return {rev,exp,pay,due,profit,margin:pct(profit,inv?due:rev),live,plan,revEst}; };
+  const profit=inv?due-pay:rev-exp-pay; return {rev,exp,pay,due,profit,margin:pct(profit,inv?due:rev),live,plan,revEst,expEst}; };
 /* قراءات تشغيلية لكل اتفاقية: الأصول والوحدات تحتها، الإشغال، المتأخرات */
 const agreementOps=k=>{ const set=new Set([k.assetId,...descendants(k.assetId).map(x=>x.id)]); const units=Store.coll('assets').filter(x=>x.level==='unit'&&set.has(x.id)); const occ=units.filter(u=>u.occupancy==='مشغول').length;
   const overdue=finOf(Store.coll('payments').filter(p=>set.has(p.assetId))).overdue;
@@ -325,6 +338,7 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
   if(noPay.length) D.push({amt:0,w:PM.noi,tone:'warn',go:'#contracts',t:`${agN(noPay.length)} بلا مبلغ محدد للهيئة الملكية`,s:'الأرباح المعروضة أعلى من الحقيقة حتى يُدخل المبلغ في الاتفاقية.'});
   if(PM.unpriced) D.push({amt:0,w:1,tone:'warn',go:'#operations',t:`${PM.unpriced} وحدة بلا إيجار محدد`,s:'الدخل الممكن والإشغال الاقتصادي لا يحسبانها.'});
   all.filter(x=>!x.live).forEach(x=>D.push({amt:x.plan.profit,u:'ربح سنوي متوقع',tone:'warn',go:x.k.type==='مستثمر'?'#investor':'#operations',t:`${nm(x)}: العقد ${x.k.status} ولم يُوقَّع`,s:'أرقامه لا تدخل في إجماليات المحفظة حتى توقيعه وتغيير حالته إلى «ساري».'}));
+  if(all.some(x=>x.expEst)) D.push({amt:0,w:1,tone:'warn',go:'#operations',t:'تكاليف بعض المشاريع تقديرية',s:`${all.filter(x=>x.expEst).map(x=>assetPlain(x.k.assetId)).join('، ')}: لا تكاليف مسجلة، فحُسبت بمرجع تكلفة الوحدة في ${costRef()?.name||'مشروع آخر'}.`});
   if(all.some(x=>x.revEst)) D.push({amt:0,w:1,tone:'warn',go:'#finance',t:'دخل التشغيل الذاتي محسوب من الإيجارات المتعاقد عليها',s:'لا توجد قيود تحصيل مسجلة، فالدخل المعروض هو الإيجار السنوي للوحدات المؤجرة. سجّل التحصيل الفعلي في المالية لتصبح الأرقام فعلية.'});
   D.sort((a,b)=>(b.w??b.amt)-(a.w??a.amt));
   /* المؤشرات الحيوية */
@@ -537,7 +551,7 @@ function leaseUnit(a,done){
     const c=Store.add('clients',{name,idNo:$('#lsI').value.trim(),phone:$('#lsP').value.trim(),email:'',kind:'مستأجر',assetId:a.id,status:'نشط',leaseStart:start,leaseEnd:end,notes:''});
     const k=agreementFor(a.id), n=Math.max(1,Math.round(m/q)), amt=Math.round(rent*q/12), P=Store.coll('payments');
     for(let i=0;i<n;i++){ const d=new Date(start); d.setMonth(d.getMonth()+i*q); P.push({id:`PY-${c.id}-${i+1}`,clientId:c.id,assetId:a.id,contractId:k?.id||'',seq:i+1,dueDate:d.toISOString().slice(0,10),amount:amt,paid:0,paidDate:'',method:''}); }
-    Store.update('assets',a.id,{occupancy:'مشغول',status:'مؤجر',tenantId:c.id,rent});
+    Store.update('assets',a.id,{occupancy:'مشغول',status:'مؤجر',tenantId:c.id,rent,vacantSince:''});
     Store.log('تأجير','assets',a.id,`${a.name} مؤجرة لـ${name} من ${start} إلى ${end}، ${n} أقساط × ${amt}`); Store.save();
     Modal.close(); toast(`أُجّرت ${a.name}`); done&&done(); };
 }
@@ -552,7 +566,7 @@ function vacateUnit(a,done){
   $('#vcOk').onclick=()=>{ const d=$('#vcD').value||today, drop=new Set(P.filter(p=>p.dueDate>d&&!(Number(p.paid)>0)).map(p=>p.id));
     Store.data.payments=Store.coll('payments').filter(p=>!drop.has(p.id));
     if(c) Store.update('clients',c.id,{status:'منتهي',leaseEnd:d});
-    Store.update('assets',a.id,{occupancy:'شاغر',status:'شاغر',tenantId:''});
+    Store.update('assets',a.id,{occupancy:'شاغر',status:'شاغر',tenantId:'',vacantSince:d});
     Store.log('إخلاء','assets',a.id,`إخلاء ${a.name}${c?' من '+c.name:''} بتاريخ ${d}، حُذف ${drop.size} قسط مستقبلي`); Store.save();
     Modal.close(); toast(`أُخليت ${a.name}`); done&&done(); };
 }
@@ -620,7 +634,7 @@ const clientOpts=()=>Store.coll('clients').map(c=>({v:c.id,l:c.name}));
 function contractCfg(where,defType){ const c={coll:'contracts',title:'عقد',
     columns:[{k:'number',label:'الرقم'},{k:'type',label:'النوع',fmt:r=>pill(AG_LABEL[r.type]||r.type)},{k:'title',label:'العنوان'},{k:'party',label:'الطرف الآخر',fmt:r=>esc(r.party?.startsWith('C-')?clientName(r.party):r.party)},{k:'assetId',label:'الأصل',fmt:r=>assetName(r.assetId),plain:r=>assetPlain(r.assetId)},{k:'start',label:'البداية',fmt:r=>`<span class="num">${r.start||'—'}</span>`},{k:'end',label:'النهاية',fmt:r=>{const d=daysTo(r.end);return `<span class="num">${r.end||'—'}</span> ${d!=null&&d<=90&&r.type!=='إطارية'&&r.type!=='تخصيص'?pill(d<0?'منتهي':`${d} يوم`):''}`;}},{k:'value',label:'القيمة',fmt:r=>money(r.value)},{k:'payToAuthority',label:'ندفع للهيئة',fmt:r=>OP_TYPES.includes(r.type)?num(r.payToAuthority):'—'},{k:'profit',label:'ربحنا',fmt:r=>OP_TYPES.includes(r.type)?`<b>${num(agreementPL(r).profit)}</b>`:'—',plain:r=>OP_TYPES.includes(r.type)?agreementPL(r).profit:''},{k:'status',label:'الحالة',fmt:r=>pill(r.status)},{k:'renewal',label:'التجديد'}],
     filters:[{k:'type',label:'النوع',options:[{v:'إطارية',l:'إطارية'},{v:'تخصيص',l:'تخصيص'},{v:'تشغيل ذاتي',l:'التشغيل الذاتي'},{v:'مستثمر',l:'إسناد التشغيل لمستثمر'},'تشغيل وصيانة','إيجار','توريد','استشاري']},{k:'status',label:'الحالة',options:['ساري','منتهي','قيد التجديد','ملغي']}],
-    fields:[{k:'number',label:'رقم العقد',required:true},{k:'type',label:'نوع العقد',type:'select',required:true,options:[{v:'إطارية',l:'إطارية'},{v:'تخصيص',l:'تخصيص'},{v:'تشغيل ذاتي',l:'التشغيل الذاتي'},{v:'مستثمر',l:'إسناد التشغيل لمستثمر'},'تشغيل وصيانة','إيجار','توريد','استشاري']},{k:'title',label:'عنوان العقد',required:true,full:true},{k:'party',label:'الطرف الآخر'},{k:'contractorId',label:'المقاول (لعقود التشغيل والصيانة)',type:'select',options:()=>Store.coll('contractors').map(x=>({v:x.id,l:x.name}))},{k:'assetId',label:'الأصل',type:'select',options:assetOpts},{k:'parentId',label:'يستند إلى (عقد أعلى)',type:'select',options:()=>Store.coll('contracts').map(k=>({v:k.id,l:`${k.number} — ${k.title}`}))},{k:'start',label:'تاريخ البداية',type:'date'},{k:'end',label:'تاريخ النهاية',type:'date'},{k:'value',label:'قيمة العقد',type:'number'},{k:'payToAuthority',label:'ما ندفعه للهيئة الملكية عن هذه الاتفاقية',type:'number'},{k:'investment',label:'التكلفة الاستثمارية الأولية (لحساب فترة الاسترداد)',type:'number'},{k:'payFromInvestor',label:'ما يدفعه المستثمر لنا',type:'number'},{k:'period',label:'دورية السداد',type:'select',options:['سنوي','نصف سنوي','ربع سنوي','شهري','دفعة واحدة']},{k:'scope',label:'نطاق العمل (مسؤولية المستثمر أو مسؤوليتنا في التشغيل الذاتي)',type:'textarea',full:true},{k:'status',label:'الحالة',type:'select',options:['ساري','مسودة','منتهي','قيد التجديد','ملغي'],default:'ساري'},{k:'renewal',label:'التجديد',type:'select',options:['تلقائي','قابل للتجديد','يحتاج قرار','غير قابل']},{k:'obligations',label:'الالتزامات',type:'textarea',full:true},{k:'notes',label:'ملاحظات',type:'textarea',full:true}]}; if(where) c.where=where; if(defType==='تشغيل ذاتي'||defType==='مستثمر') c.onChange=()=>{ const y=scrollY; App.render(); requestAnimationFrame(()=>scrollTo(0,y)); }; c.onSave=o=>{ if(o.contractorId&&!o.party) Store.update('contracts',o.id,{party:Store.get('contractors',o.contractorId)?.name||''}); if(!o.parentId){ const k=agreementFor(o.assetId); if(k&&k.id!==o.id&&!OP_TYPES.includes(o.type)) Store.update('contracts',o.id,{parentId:k.id}); } }; if(defType){ const f=c.fields.find(x=>x.k==='type'); f.default=defType; c.title={'مستثمر':'عقد مستثمر','تشغيل ذاتي':'اتفاقية تشغيل ذاتي','تشغيل وصيانة':'عقد تشغيل وصيانة'}[defType]||'عقد'; } return c; }
+    fields:[{k:'number',label:'رقم العقد',required:true},{k:'type',label:'نوع العقد',type:'select',required:true,options:[{v:'إطارية',l:'إطارية'},{v:'تخصيص',l:'تخصيص'},{v:'تشغيل ذاتي',l:'التشغيل الذاتي'},{v:'مستثمر',l:'إسناد التشغيل لمستثمر'},'تشغيل وصيانة','إيجار','توريد','استشاري']},{k:'title',label:'عنوان العقد',required:true,full:true},{k:'party',label:'الطرف الآخر'},{k:'contractorId',label:'المقاول (لعقود التشغيل والصيانة)',type:'select',options:()=>Store.coll('contractors').map(x=>({v:x.id,l:x.name}))},{k:'assetId',label:'الأصل',type:'select',options:assetOpts},{k:'parentId',label:'يستند إلى (عقد أعلى)',type:'select',options:()=>Store.coll('contracts').map(k=>({v:k.id,l:`${k.number} — ${k.title}`}))},{k:'start',label:'تاريخ البداية',type:'date'},{k:'end',label:'تاريخ النهاية',type:'date'},{k:'value',label:'قيمة العقد',type:'number'},{k:'payToAuthority',label:'ما ندفعه للهيئة الملكية عن هذه الاتفاقية',type:'number'},{k:'opsPerUnit',label:'تكلفة تشغيل الوحدة سنوياً (خطة، تُستخدم حتى تُسجَّل تكاليف فعلية)',type:'number'},{k:'omLinkId',label:'عقد صيانة قائم يغطي هذا المشروع',type:'select',options:()=>Store.coll('contracts').filter(x=>x.type==='تشغيل وصيانة').map(x=>({v:x.id,l:`${x.number} — ${x.title}`}))},{k:'investment',label:'التكلفة الاستثمارية الأولية (لحساب فترة الاسترداد)',type:'number'},{k:'payFromInvestor',label:'ما يدفعه المستثمر لنا',type:'number'},{k:'period',label:'دورية السداد',type:'select',options:['سنوي','نصف سنوي','ربع سنوي','شهري','دفعة واحدة']},{k:'scope',label:'نطاق العمل (مسؤولية المستثمر أو مسؤوليتنا في التشغيل الذاتي)',type:'textarea',full:true},{k:'status',label:'الحالة',type:'select',options:['ساري','مسودة','منتهي','قيد التجديد','ملغي'],default:'ساري'},{k:'renewal',label:'التجديد',type:'select',options:['تلقائي','قابل للتجديد','يحتاج قرار','غير قابل']},{k:'obligations',label:'الالتزامات',type:'textarea',full:true},{k:'notes',label:'ملاحظات',type:'textarea',full:true}]}; if(where) c.where=where; if(defType==='تشغيل ذاتي'||defType==='مستثمر') c.onChange=()=>{ const y=scrollY; App.render(); requestAnimationFrame(()=>scrollTo(0,y)); }; c.onSave=o=>{ if(o.contractorId&&!o.party) Store.update('contracts',o.id,{party:Store.get('contractors',o.contractorId)?.name||''}); if(!o.parentId){ const k=agreementFor(o.assetId); if(k&&k.id!==o.id&&!OP_TYPES.includes(o.type)) Store.update('contracts',o.id,{parentId:k.id}); } }; if(defType){ const f=c.fields.find(x=>x.k==='type'); f.default=defType; c.title={'مستثمر':'عقد مستثمر','تشغيل ذاتي':'اتفاقية تشغيل ذاتي','تشغيل وصيانة':'عقد تشغيل وصيانة'}[defType]||'عقد'; } return c; }
 M.contracts={key:'contracts',label:'العقود',icon:'📜',group:'الأساسي',render(v){
   const K=Store.coll('contracts');
   v.innerHTML=`<div class="grid g4 mb">
@@ -703,7 +717,9 @@ function agCard(k){ const p0=agreementPL(k), p=p0.live?p0:Object.assign({},p0,p0
   if(d!=null&&d<=90) N.push(['bad',d<0?`انتهى العقد منذ ${-d} يوماً.`:`العقد ينتهي خلال ${d} يوماً: قرّر التجديد.`]);
   if(o.overdue>0) N.push(['bad',`متأخرات ${short(o.overdue)} على ${lateN} مستأجر.`]);
   if(noAuth) N.push(['warn','مبلغ الهيئة الملكية غير محدد، فالربح المعروض أعلى من الحقيقة.']);
-  if(!inv&&!p.exp) N.push(['warn','لا توجد تكاليف تشغيل مسجلة، فالربح المعروض أعلى من الحقيقة.']);
+  if(!inv&&p0.expEst==='plan') N.push(['info','التكاليف من خطة المشروع (تشغيل الوحدات وعقد الصيانة). تُستبدل بالفعلية عند تسجيل القيود في المالية.']);
+  else if(!inv&&p0.expEst){ const R=costRef(); N.push(['info',`التكاليف تقديرية: ${Math.round(R.perUnit).toLocaleString('en-US')} ر.س للوحدة سنوياً بمرجع ${R.name}. سجّل التكاليف الفعلية لتصبح دقيقة.`]); }
+  else if(!inv&&!p.exp) N.push(['warn','لا توجد تكاليف تشغيل مسجلة، فالربح المعروض أعلى من الحقيقة.']);
   if(p0.revEst) N.push(['info','الدخل محسوب من إيجارات الوحدات المؤجرة، لا من تحصيل فعلي.']);
   if(inv){ const rs=reqStats(reqsOf(k.id)); if(rs.late) N.push(['bad',`${rs.late} من متطلبات العقد متأخرة.`]); if(p0.live&&p.due&&!p.rev) N.push(['info','لم تُسجَّل دفعات من المستثمر بعد.']); }
   else if(o.units&&o.occPct<75) N.push(['warn',`${o.units-o.occ} وحدة شاغرة (الإشغال ${o.occPct}%).`]);
@@ -1067,16 +1083,74 @@ M.operations={key:'operations',label:'التشغيل الذاتي',icon:'🏠',g
   const allF=finOf(selfPays); const due=allF.overdue; const rentTotal=sum(occ,'rent');
   const bld=Store.coll('assets').filter(a=>a.level==='building'&&isSelf(a));
   const lateC=Store.coll('clients').filter(c=>uid.has(c.assetId)&&clientFin(c).overdue>0).length, nP=SK.length;
+  /* إجابات أسئلة المدير: كلها محسوبة من بيانات التشغيل الذاتي فقط */
+  const QA=(()=>{ const t=todayStr(), N=x=>Math.round(x).toLocaleString('en-US'), vac=units.filter(u=>u.occupancy!=='مشغول'), rehab=vac.filter(u=>/صيانة|تأهيل|متوقف/.test(String(u.condition||'')+String(u.status||'')));
+    const avgRent=occ.length?sum(occ,'rent')/occ.length:0, loss=sum(vac,'rent');
+    const B=bld.map(b=>{ const u=units.filter(x=>x.parentId===b.id), o=u.filter(x=>x.occupancy==='مشغول'), ids=new Set(u.map(x=>x.id)); return {n:`${b.name} (${assetPlain(b.parentId)})`,u:u.length,o:o.length,occ:pct(o.length,u.length),rent:o.length?sum(o,'rent')/o.length:0,over:finOf(selfPays.filter(p=>ids.has(p.assetId))).overdue}; }).filter(x=>x.u);
+    const BR=B.filter(x=>x.o).sort((x,y)=>y.rent-x.rent), sameRent=BR.length&&Math.round(BR[0].rent)===Math.round(BR[BR.length-1].rent);
+    const score=x=>x.occ-(x.over?Math.min(40,x.over/Math.max(1,x.rent*x.o)*100):0), BS=B.slice().sort((x,y)=>score(y)-score(x));
+    const vs=vac.filter(u=>u.vacantSince).map(u=>-daysTo(u.vacantSince)).filter(x=>x>=0);
+    const C=Store.coll('clients').filter(c=>uid.has(c.assetId)&&c.status!=='منتهي'), endOf=c=>{ if(c.leaseEnd) return c.leaseEnd; const P=paysOfClient(c.id); if(P.length<2) return null; const gap=Math.max(1,Math.round((new Date(P[1].dueDate)-new Date(P[0].dueDate))/2629800000)), d=new Date(P[P.length-1].dueDate); d.setMonth(d.getMonth()+gap); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); };
+    const ending=C.map(c=>({c,e:endOf(c)})).filter(x=>x.e&&daysTo(x.e)<=90&&daysTo(x.e)>=0);
+    const dueP=selfPays.filter(p=>p.dueDate&&p.dueDate<=t), dueAmt=sum(dueP,'amount'), paid=dueP.reduce((a,p)=>a+Math.min(Number(p.paid)||0,Number(p.amount)||0),0);
+    const ag=[0,0,0,0]; let oldest=0; selfPays.forEach(p=>{ const r=(Number(p.amount)||0)-(Number(p.paid)||0); if(r<=0||!p.dueDate||p.dueDate>=t) return; const dd=-daysTo(p.dueDate); oldest=Math.max(oldest,dd); ag[dd<=30?0:dd<=60?1:dd<=90?2:3]+=r; });
+    const dueToday=selfPays.filter(p=>p.dueDate>=t&&daysTo(p.dueDate)<=7&&(Number(p.paid)||0)<(Number(p.amount)||0));
+    const PL=SK.map(k=>({k,...agreementPL(k)})).filter(x=>x.live), rev=sum(PL,'rev'), exp=sum(PL,'exp'), pay=sum(PL,'pay'), est=PL.filter(x=>x.expEst), R=costRef();
+    const per={'سنوي':12,'نصف سنوي':6,'ربع سنوي':3,'شهري':1}, nextPay=PL.filter(x=>x.pay).map(x=>{ const m=per[x.k.period]||12, d=new Date(x.k.start||t); for(let i=0;i<600&&d.toISOString().slice(0,10)<t;i++) d.setMonth(d.getMonth()+m); return {n:assetPlain(x.k.assetId),amt:x.pay*m/12,d:d.toISOString().slice(0,10)}; }).sort((x,y)=>x.d.localeCompare(y.d));
+    const obs=obsStats(Store.coll('observations').filter(o=>omContracts().some(k=>k.id===o.contractId&&SK.some(s=>s.id===agreementFor(k.assetId)?.id))));
+    const who=r=>Store.coll('users').find(u=>u.role===r)?.name||ROLES[r];
+    const A=[];
+    if(due) A.push({t:`حصّل متأخرات ${short(due)} من ${lateC} مستأجر`,s:ag[3]?`منها ${short(ag[3])} تجاوزت 90 يوماً وتحتاج إجراءً نظامياً.`:`أقدمها منذ ${oldest} يوماً.`,w:who('finance'),tone:'bad',go:'units'});
+    if(dueToday.length) A.push({t:`${dueToday.length} قسط يستحق خلال 7 أيام بقيمة ${short(sum(dueToday,'amount'))}`,s:'ذكّر المستأجرين قبل الاستحقاق.',w:who('finance'),tone:'warn',go:'units'});
+    if(vac.length-rehab.length) A.push({t:`سوّق ${vac.length-rehab.length} وحدة شاغرة جاهزة للتأجير`,s:`كل شهر شغور يضيّع ${short(sum(vac.filter(u=>!rehab.includes(u)),'rent')/12)}.`,w:who('manager'),tone:'warn',go:'units'});
+    if(rehab.length) A.push({t:`أهّل ${rehab.length} وحدة متعطلة عن التأجير بسبب حالتها`,s:'لا تُؤجَّر قبل تأهيلها.',w:who('engineer'),tone:'warn',go:'units'});
+    if(ending.length) A.push({t:`جدّد ${ending.length} عقد إيجار ينتهي خلال 90 يوماً`,s:`أقربها ${ending.sort((x,y)=>x.e.localeCompare(y.e))[0].e}.`,w:who('manager'),tone:'warn',go:'units'});
+    if(obs.overdue) A.push({t:`${obs.overdue} ملاحظة على المقاولين تجاوزت موعد إغلاقها`,s:`المفتوح الآن ${obs.open}.`,w:who('engineer'),tone:'bad',go:'ops'});
+    nextPay.filter(x=>daysTo(x.d)<=30).forEach(x=>A.push({t:`سدّد ${short(x.amt)} للهيئة الملكية عن ${x.n}`,s:`يستحق في ${x.d}.`,w:who('finance'),tone:'warn',go:'sag'}));
+    est.forEach(x=>A.push({t:`سجّل التكاليف الفعلية لـ${assetPlain(x.k.assetId)}`,s:'تكاليفه الآن تقديرية بمرجع مشروع آخر.',w:who('finance'),tone:'info',go:'sag'}));
+    const row=(q,a,n)=>`<div class="qar"><span>${q}</span><b>${a}</b>${n?`<small>${n}</small>`:''}</div>`;
+    return `<div class="card mb ddec"><h3>المطلوب اليوم <span class="small muted">الإجراء والمسؤول عنه</span></h3>${A.length?A.map((x,i)=>`<a class="drow ${x.tone}" href="#" data-tab="${x.go}"><span class="dn">${i+1}</span><div class="dt"><b>${esc(x.t)}</b><div class="small muted">${esc(x.s)}</div></div><div class="damt"><small>المسؤول</small><b style="font-size:15px">${esc(x.w)}</b></div><span class="dgo">←</span></a>`).join(''):'<div class="empty">لا إجراءات مطلوبة اليوم.</div>'}</div>
+    <div class="grid g2 mb">
+      <div class="card qa"><h3>الوحدات والإشغال</h3>
+        ${row('إجمالي الوحدات',units.length,`في ${bld.length} مبنى و${SK.length} مشروع`)}${row('المؤجرة / الشاغرة',`${occ.length} / ${vac.length}`,`نسبة الإشغال ${pct(occ.length,units.length)}%`)}
+        ${row('الشاغرة الجاهزة للتأجير',vac.length-rehab.length,rehab.length?`و${rehab.length} تحتاج تأهيلاً قبل التأجير`:'لا توجد وحدات تحتاج تأهيلاً')}
+        ${row('الإيراد المفقود بسبب الشواغر',short(loss),`سنوياً، أي ${short(loss/12)} شهرياً`)}
+        ${row('متوسط مدة بقاء الوحدة شاغرة',vs.length?`${Math.round(vs.reduce((a,x)=>a+x,0)/vs.length)} يوماً`:'غير متوفر',vs.length?`محسوب من ${vs.length} وحدة سُجّل إخلاؤها`:'يبدأ القياس من أول إخلاء يُسجَّل بزر «إخلاء الوحدة»')}</div>
+      <div class="card qa"><h3>الإيجارات والعقود</h3>
+        ${row('متوسط الإيجار السنوي للوحدة المؤجرة',`${N(avgRent)} ر.س`,`${N(avgRent/12)} شهرياً`)}
+        ${row('أعلى مبنى في متوسط الإيجار',BR.length?(sameRent?'متساوية':esc(BR[0].n)):'—',BR.length?(sameRent?'كل المباني بنفس متوسط الإيجار':`${N(BR[0].rent)} ر.س`):'')}
+        ${sameRent||BR.length<2?'':row('أقل مبنى في متوسط الإيجار',esc(BR[BR.length-1].n),`${N(BR[BR.length-1].rent)} ر.س`)}
+        ${row('عقود إيجار تنتهي خلال 90 يوماً',ending.length,ending.length?`أقربها ${ending.sort((x,y)=>x.e.localeCompare(y.e))[0].e}`:'لا يوجد')}</div>
+      <div class="card qa"><h3>التحصيل والمتأخرات</h3>
+        ${row('المستحق حتى اليوم',short(dueAmt),`حُصّل منه ${short(paid)} (${pct(paid,dueAmt)}%)`)}
+        ${row('المتأخرات',short(due),due?`أقدمها منذ ${oldest} يوماً`:'لا توجد')}
+        ${due?`<div class="qag">${[['حتى 30 يوم',ag[0]],['31-60',ag[1]],['61-90',ag[2]],['أكثر من 90',ag[3]]].map(([l,x],i)=>`<div class="${x&&i===3?'bad':''}"><small>${l}</small><b>${short(x)}</b></div>`).join('')}</div>`:''}
+        ${row('مستأجرون عليهم متأخرات',lateC,`من ${C.length} مستأجر`)}</div>
+      <div class="card qa"><h3>التكاليف وصافي الدخل <span class="small muted">سنوياً</span></h3>
+        ${row('تكاليف التشغيل والصيانة',short(exp),est.length?`منها ${short(sum(est,'exp'))} تقديرية لـ${est.map(x=>assetPlain(x.k.assetId)).join('، ')}`:'من القيود المسجلة')}
+        ${row('متوسط تكلفة التشغيل للوحدة',`${N(units.length?exp/units.length:0)} ر.س`,`${N(units.length?exp/units.length/12:0)} شهرياً`)}
+        ${row('التزاماتنا للهيئة الملكية',short(pay),nextPay.length?nextPay.map(x=>`${x.n}: ${short(x.amt)} في ${x.d}`).join(' · '):'لا التزامات مسجلة')}
+        ${row('صافي دخل التشغيل',`<span class="${rev-exp-pay<0?'neg':''}">${short(rev-exp-pay)}</span>`,`دخل ${short(rev)} − تكاليف ${short(exp)} − الهيئة ${short(pay)}`)}</div>
+      <div class="card qa"><h3>المباني والصيانة</h3>
+        ${row('أفضل مبنى أداءً',BS.length?esc(BS[0].n):'—',BS.length?`إشغال ${BS[0].occ}%${BS[0].over?` · متأخرات ${short(BS[0].over)}`:' · بلا متأخرات'}`:'')}
+        ${row('مبنى يحتاج تدخلك',BS.length>1?esc(BS[BS.length-1].n):'—',BS.length>1?`إشغال ${BS[BS.length-1].occ}%${BS[BS.length-1].over?` · متأخرات ${short(BS[BS.length-1].over)}`:''}`:'')}
+        ${row('ملاحظات مفتوحة على المقاولين',obs.open,obs.overdue?`${obs.overdue} تجاوزت موعد المعالجة`:'لا شيء متأخر')}
+        ${row('وحدات متعطلة بسبب الصيانة',rehab.length,rehab.length?'شاغرة وحالتها تحتاج تأهيلاً':'لا يوجد')}</div>
+      <div class="card qa"><h3>مرجع التكاليف <span class="small muted">${R?`من ${esc(R.name)} · ${R.units} وحدة`:''}</span></h3>
+        ${R?R.cats.map(([c,a])=>row(esc(c),`${N(a)} ر.س`,`للوحدة سنوياً · ${N(a/12)} شهرياً`)).join('')+`<div class="qar tot"><span>إجمالي تكلفة الوحدة</span><b>${N(R.perUnit)} ر.س</b><small>سنوياً · ${N(R.perUnit/12)} شهرياً. يُطبَّق على أي مشروع لم تُسجَّل تكاليفه.</small></div>`:'<div class="empty">لا توجد تكاليف مسجلة لأي مشروع بعد.</div>'}</div>
+    </div>`; })();
   v.innerHTML=`<div class="pagehead self"><div><h3>🏠 التشغيل الذاتي <span class="en">Self-Operation</span></h3><p class="small muted">ندفع للهيئة الملكية ونتولى التأجير والتحصيل والتشغيل بأنفسنا.</p></div><div class="phx">${can('edit')?'<button class="btn p sm" data-np="self">＋ إضافة مشروع</button>':''}</div></div>
   <div class="sumline mb"><div><span>المشاريع</span><b>${nP}</b></div><div><span>الوحدات</span><b>${units.length}</b><small>في ${bld.length} مبنى</small></div><div><span>الإشغال</span><b>${pct(occ.length,units.length)}%</b><small>${occ.length} مؤجرة</small></div><div><span>المحصّل</span><b>${short(allF.paid)}</b><small>من ${short(allF.total)}</small></div><div class="${due?'bad':''}"><span>متأخرات</span><b>${short(due)}</b><small>${lateC?`على ${lateC} مستأجر`:'لا يوجد'}</small></div></div>
-  <div class="tabs"><button class="active" data-t="sag">المشاريع</button><button data-t="units">الوحدات والمستأجرون</button><button data-t="ops">التشغيل والصيانة</button></div>
-  <div data-p="sag"><div class="grid g2">${SK.map(agCard).join('')||'<div class="card empty">لا توجد مشاريع تشغيل ذاتي. أضف مشروعاً من الزر أعلاه.</div>'}</div></div>
+  <div class="tabs"><button class="active" data-t="qa">الملخص</button><button data-t="sag">المشاريع</button><button data-t="units">الوحدات والمستأجرون</button><button data-t="ops">التشغيل والصيانة</button></div>
+  <div data-p="qa">${QA}</div>
+  <div data-p="sag" class="hidden"><div class="grid g2">${SK.map(agCard).join('')||'<div class="card empty">لا توجد مشاريع تشغيل ذاتي. أضف مشروعاً من الزر أعلاه.</div>'}</div></div>
   <div data-p="units" class="hidden"><h3 class="sech">الوحدات <span class="small muted">افتح أي وحدة لتأجيرها أو إخلائها</span></h3><div id="occBox"></div><h3 class="sech">المستأجرون</h3><div id="clBox"></div></div>
   <div data-p="ops" class="hidden"><h3 class="sech">مقاولو التشغيل والصيانة</h3><div id="omBox"></div><h3 class="sech">العدادات</h3><div id="mtBox"></div><h3 class="sech">حالة المباني</h3>
     <div class="grid g3">${bld.map(b=>{ const u=units.filter(x=>x.parentId===b.id); const o=u.filter(x=>x.occupancy==='مشغول').length; return `<div class="card"><h3>${esc(b.name)} ${pill(b.condition)}</h3><div class="small muted">${esc(assetPlain(b.parentId))}</div><div style="margin:8px 0">الإشغال ${o}/${u.length}</div><div class="bar"><i style="width:${pct(o,u.length)}%"></i></div></div>`; }).join('')||'<div class="card empty">لا توجد مبانٍ</div>'}</div></div>`;
   v.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{ v.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); v.querySelectorAll('[data-p]').forEach(p=>p.classList.toggle('hidden',p.dataset.p!==b.dataset.t)); });
   renderOM($('#omBox',v)); renderMeters($('#mtBox',v));
   bindAgCards(v);
+  v.querySelectorAll('[data-tab]').forEach(a=>a.onclick=e=>{ e.preventDefault(); const b=v.querySelector(`.tabs button[data-t="${a.dataset.tab}"]`); if(b){ b.click(); window.scrollTo({top:0,behavior:'smooth'}); } });
   crud(Object.assign(assetCrudCfg(a=>a.level==='unit'&&isSelf(a)),{title:'وحدة',columns:[{k:'code',label:'الرمز'},{k:'name',label:'الوحدة'},{k:'parentId',label:'المبنى',fmt:r=>assetPlain(r.parentId),plain:r=>assetPlain(r.parentId)},{k:'type',label:'النموذج'},{k:'occupancy',label:'الإشغال',fmt:r=>pill(r.occupancy)},{k:'tenantId',label:'المستأجر',fmt:r=>esc(clientName(r.tenantId)),plain:r=>clientName(r.tenantId)},{k:'rent',label:'الإيجار السنوي',fmt:r=>money(r.rent)},{k:'pTotal',label:'قيمة الدفعات',fmt:r=>{const f=finOf(paysOfAsset(r.id));return f.count?num(f.total):'—';},plain:r=>finOf(paysOfAsset(r.id)).total},{k:'pPaid',label:'المسدد',fmt:r=>{const f=finOf(paysOfAsset(r.id));return f.count?num(f.paid):'—';},plain:r=>finOf(paysOfAsset(r.id)).paid},{k:'pRem',label:'المتبقي',fmt:r=>{const f=finOf(paysOfAsset(r.id));return f.count?`<b>${num(f.remaining)}</b>`:'—';},plain:r=>finOf(paysOfAsset(r.id)).remaining},{k:'pOver',label:'المتأخر',fmt:r=>{const f=finOf(paysOfAsset(r.id));return f.overdue?`<span class="pill bad">${num(f.overdue)}</span>`:(f.count?'<span class="pill ok">لا يوجد</span>':'—');},plain:r=>finOf(paysOfAsset(r.id)).overdue},{k:'pBar',label:'نسبة السداد',fmt:r=>finBar(finOf(paysOfAsset(r.id))),plain:r=>finOf(paysOfAsset(r.id)).pct},{k:'agreement',label:'الاتفاقية',fmt:r=>agPill(agreementFor(r.id)),plain:r=>agPlain(agreementFor(r.id))}],filters:[{k:'occupancy',label:'الإشغال',options:['مشغول','شاغر']},{k:'parentId',label:'المبنى',options:()=>bld.map(b=>({v:b.id,l:b.name}))}]}),$('#occBox',v));
   crud({coll:'clients',title:'ملف عميل',detail:clientDetail,
     columns:[{k:'id',label:'الرقم'},{k:'name',label:'الاسم'},{k:'phone',label:'الجوال',fmt:r=>`<span class="num">${esc(r.phone||'—')}</span>`},{k:'assetId',label:'الوحدة',fmt:r=>assetName(r.assetId),plain:r=>assetPlain(r.assetId)},
@@ -1616,13 +1690,19 @@ const NP_STEPS=[
   {id:'start',t:'date',s:'بداية الاتفاقية',l:'متى تبدأ الاتفاقية؟',w:['لحساب مدة الاتفاقية ومواعيد الاستحقاق والتنبيهات.','تُحسب منها نهاية الاتفاقية حسب المدة في السؤال التالي.','إن لم يُحدد بعد، ضع التاريخ المتوقع.']},
   {id:'years',t:'num',s:'مدة الاتفاقية',l:'كم سنة مدة الاتفاقية؟',u:'سنة',min:1,max:50,def:10,w:['المدة تحدد الأفق الذي يُسترد فيه الاستثمار.','تاريخ النهاية = البداية + المدة، ويُنبهك النظام قبل الانتهاء.','اكتب المدة المتبقية فعلاً إن كانت الاتفاقية قائمة.']},
   {id:'inv',t:'num',s:'التكلفة الاستثمارية',l:'كم التكلفة الاستثمارية الأولية للمشروع؟',u:'ر.س',min:0,def:0,hint:'تجهيز وتشطيب وأثاث، صفر إن لم توجد',w:['لحساب فترة استرداد ما صرفته.','تُسجَّل في الاتفاقية «التكلفة الاستثمارية»، وتظهر في صفحة التدفقات والاسترداد.','ضع ما صُرف أو سيُصرف قبل التشغيل.']},
+  {id:'opsM',t:'num',s:'تشغيل الوحدة شهرياً',l:'كم تكلفة تشغيل الوحدة شهرياً؟',u:'ر.س شهرياً',min:0,when:a=>a.model!=='inv',def:()=>npRef().ops,hint:'رواتب التأجير والتحصيل، الحراسة، النظافة، العدادات، التأمين والإدارة. بدون الصيانة',w:['التشغيل الذاتي يحمّلك تكاليف شهرية ثابتة لكل وحدة.','تُحفظ في الاتفاقية خطةً للتكاليف: عدد الوحدات × التكلفة × 12، وتُخصم من الدخل لحساب الربح حتى تسجّل التكاليف الفعلية في المالية.','الرقم المقترح مأخوذ من تكاليف مشروعك القائم الأكثر تسجيلاً، بعد استبعاد الصيانة.']},
+  {id:'omMode',t:'opts',s:'عقد الصيانة',l:'كيف ستُغطّى صيانة المشروع؟',when:a=>a.model!=='inv',optsF:()=>Object.assign({new:{l:'عقد صيانة جديد'}},Store.coll('contracts').some(x=>x.type==='تشغيل وصيانة')?{link:{l:'ربط بعقد صيانة قائم'}}:{},{none:{l:'لا يوجد حالياً'}}),def:'new',w:['الصيانة من أكبر التكاليف، وتُدار بعقد مع مقاول.','«جديد»: يُنشأ عقد صيانة للمشروع بالتكلفة التي تحددها. «ربط»: يُربط المشروع بعقد قائم، وتُحسب حصته بنفس تكلفة الوحدة في ذلك العقد.','اربط بعقد قائم إن كان نفس المقاول سيغطي المشروعين.']},
+  {id:'omM',t:'num',s:'صيانة الوحدة شهرياً',l:'كم تكلفة عقد الصيانة للوحدة شهرياً؟',u:'ر.س شهرياً',min:0,when:a=>a.model!=='inv'&&(a.omMode||'new')==='new',def:()=>npRef().om,hint:'تشمل الصيانة الوقائية والإصلاحات',w:['لتحديد قيمة عقد الصيانة السنوية.','يُنشأ عقد «تشغيل وصيانة» للمشروع قيمته: عدد الوحدات × التكلفة × 12، ويظهر في تبويب التشغيل والصيانة.','الرقم المقترح من عقد الصيانة في مشروعك القائم. أكّده بعرض سعر.']},
+  {id:'omLink',t:'opts',s:'العقد القائم',l:'أي عقد صيانة قائم يغطي هذا المشروع؟',when:a=>a.model!=='inv'&&a.omMode==='link',optsF:()=>Object.fromEntries(Store.coll('contracts').filter(x=>x.type==='تشغيل وصيانة').map(x=>[x.id,{l:`${x.number} · ${assetPlain(x.assetId)} · ${short(x.value)} سنوياً`}])),w:['لربط المشروع بمقاول الصيانة الحالي.','تُحسب صيانة المشروع الجديد بنفس تكلفة الوحدة في العقد المختار، حتى تُسجَّل تكاليفه الفعلية.','عدّل قيمة العقد الأصلي لاحقاً إن زادت بضم المشروع الجديد.']},
   {id:'model',t:'opts',s:'نموذج التشغيل',l:'كيف ستشغّل المشروع؟',opts:NP_MODEL,when:a=>!a.fixed,def:'help',w:['النموذج يحدد من يؤجر ويحصّل ويصون: أنت أو المستثمر.','يحدد نوع الاتفاقية التي تُنشأ، وأين يظهر المشروع: صفحة التشغيل الذاتي أو صفحة الإسناد لمستثمر.','إن لم تكن متأكداً اختر «ساعدني»، ونحسب لك التوصية بنفس أرقامك قبل الإنشاء.']},
   {id:'investor',t:'text',s:'المستثمر',l:'ما اسم المستثمر؟',when:a=>a.model==='inv',req:1,w:['يُسجَّل طرفاً في عقد الإسناد.','يظهر في صفحة الإسناد لمستثمر ومتابعة الدفعات.','اكتب الاسم التجاري كما في العقد.']},
   {id:'offer',t:'num',s:'دفعة المستثمر السنوية',l:'كم يدفع المستثمر سنوياً؟',u:'ر.س',min:0,when:a=>a.model!=='self',hintF:a=>a.model==='help'?'إن وصلك عرض؛ صفر إن لم يصل':'',w:['هذا دخلك المضمون في الإسناد.','يُسجَّل «ما يدفعه المستثمر لنا»، والفرق بينه وبين مبلغ الهيئة ربحك.','قارن العروض على نفس الشروط: الزيادة الدورية وفترة السماح.']},
   {id:'review',t:'review',l:'راجع وأنشئ المشروع'}
 ];
 const npSteps=a=>NP_STEPS.filter(s=>!s.when||s.when(a));
-const npVal=(a,s)=>a[s.id]??(s.id==='start'?todayStr():s.def??(s.t==='num'?0:''));
+/* مقترحات التكلفة الشهرية للوحدة من المشروع المرجعي: الصيانة وحدها، وباقي التشغيل */
+const npRef=()=>{ const R=costRef(); if(!R) return {ops:525,om:290}; const om=sum(R.cats.filter(c=>/صيانة/.test(c[0])).map(c=>({v:c[1]})),'v'); return {ops:Math.round((R.perUnit-om)/12),om:Math.round(om/12)}; };
+const npVal=(a,s)=>a[s.id]??(s.id==='start'?todayStr():typeof s.def==='function'?s.def(a):s.def??(s.t==='num'?0:''));
 /* التوصية لمن اختار «ساعدني»: نفس محرك دراسة الفرص بأرقام المشروع */
 function npAdvise(a){ const S=wiSys(), v={}; const over={qUnits:a.units||0,qRent:a.rent||0,auth:a.auth||0,qH:Math.min(30,a.years||10),qOffer:a.offer||0,qReady:a.inv?'no':'yes',setup:a.inv||0};
   WI_FD.forEach(f=>{ v[f.id]=over[f.id]!=null?over[f.id]:f.def(v,S); }); const D=wiDecide(v); return {D,A:wiAdvice(D,S)}; }
@@ -1639,10 +1719,14 @@ function npCreate(a,model){ const all=Store.coll('assets'), yr=new Date().getFul
   const alloc=Store.coll('contracts').find(k=>k.type==='تخصيص'), start=a.start||todayStr(), end=(()=>{ const d=new Date(start); d.setFullYear(d.getFullYear()+Math.round(a.years||10)); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); })();
   const pre=self?'SELF':'INV'; let cnt=Store.coll('contracts').filter(k=>String(k.number||'').startsWith(`${pre}-${yr}`)).length+1; while(Store.coll('contracts').some(k=>k.number===`${pre}-${yr}-${String(cnt).padStart(2,'0')}`)) cnt++;
   const K=Store.add('contracts',{number:`${pre}-${yr}-${String(cnt).padStart(2,'0')}`,type:self?'تشغيل ذاتي':'مستثمر',title:self?`اتفاقية تشغيل ذاتي لـ${a.name}`:`عقد تشغيل ${a.name} مع مستثمر`,party:self?'الهيئة الملكية':(a.investor||'مستثمر'),assetId:P.id,parentId:alloc?.id||'',start,end,value:Math.round((self?(a.auth||0):(a.offer||0))*Math.round(a.years||10)),payToAuthority:Number(a.auth)||0,payFromInvestor:self?0:(Number(a.offer)||0),investment:Number(a.inv)||0,period:'سنوي',scope:self?`نحن المسؤولون: تأجير ${U.length} وحدة وتحصيلها وصيانتها`:'التشغيل الكامل: التأجير والتحصيل والصيانة وإدارة المرافق',status:'ساري',renewal:'يحتاج قرار'});
+  if(self){ const g=id=>npVal(a,NP_STEPS.find(x=>x.id===id)), mode=a.omMode||'new'; K.opsPerUnit=(Number(g('opsM'))||0)*12;
+    if(mode==='link'&&a.omLink) K.omLinkId=a.omLink;
+    if(mode==='new'&&Number(g('omM'))>0){ const on=Store.coll('contracts').filter(x=>String(x.number||'').startsWith(`OM-${yr}`)).length+1; let c=on; while(Store.coll('contracts').some(x=>x.number===`OM-${yr}-${String(c).padStart(2,'0')}`)) c++;
+      Store.add('contracts',{number:`OM-${yr}-${String(c).padStart(2,'0')}`,type:'تشغيل وصيانة',title:`عقد صيانة ${a.name}`,party:'',assetId:P.id,parentId:K.id,start,end,value:Math.round(Number(g('omM'))*12*U.length),period:'شهري',status:'ساري',renewal:'قابل للتجديد',obligations:'صيانة وقائية وإصلاحات',notes:'أُنشئ مع المشروع: حدّد المقاول من تبويب التشغيل والصيانة'}); } }
   Store.log('إضافة','assets',P.id,`إنشاء مشروع ${a.name}: ${B.length} مبنى و${U.length} وحدة واتفاقية ${K.number}`); Store.save();
   return {P,B,U,K}; }
 M.newproject={key:'newproject',label:'إضافة مشروع',icon:'➕',group:'الرئيسية',render(v){
-  const st=NPView, a=st.a, steps=npSteps(a), i=Math.max(0,Math.min(steps.length-1,st.step)), s=steps[i], cur=npVal(a,s);
+  const st=NPView, a=st.a, steps=npSteps(a), i=Math.max(0,Math.min(steps.length-1,st.step)), s=steps[i].optsF?Object.assign({},steps[i],{opts:steps[i].optsF(a)}):steps[i], cur=npVal(a,s);
   const full=(a.units||0)*(a.rent||0);
   const live=`<div class="wzlive"><div class="small muted">ملخص ما أدخلته</div>
     ${a.name?`<div><span>المشروع</span><b>${esc(a.name)}</b></div>`:''}<div><span>الوحدات</span><b>${a.units||'—'}${a.bld?` في ${a.bld} مبنى`:''}</b></div>
@@ -1662,7 +1746,7 @@ M.newproject={key:'newproject',label:'إضافة مشروع',icon:'➕',group:'�
         <div class="small" style="margin-top:8px"><a href="#whatif" id="npStudy">افتح الدراسة الكاملة بهذه الأرقام</a></div></div>`:''}
       <div class="nplist">${row('المشروع',esc(a.name||'—'))}${row('الموقع',esc(a.city||'—'))}${row('النوع',esc(a.kind||NP_KIND['سكني - فلل'].l))}
       ${row('المباني',a.bld?`${a.bld} مبنى`:'بدون مبانٍ (الوحدات تتبع المشروع)')}${row('الوحدات',`${a.units||0} وحدة بإيجار ${num(a.rent||0)} ر.س`)}
-      ${row('المسدد للهيئة الملكية',`${num(a.auth||0)} ر.س سنوياً`)}${row('الاتفاقية',`${npVal(a,{id:'start'})} لمدة ${a.years||10} سنوات`)}${row('التكلفة الاستثمارية',`${num(a.inv||0)} ر.س`)}
+      ${row('المسدد للهيئة الملكية',`${num(a.auth||0)} ر.س سنوياً`)}${row('الاتفاقية',`${npVal(a,{id:'start'})} لمدة ${a.years||10} سنوات`)}${pick==='self'?row('تشغيل الوحدة',`${num(npVal(a,NP_STEPS.find(x=>x.id==='opsM')))} ر.س شهرياً`)+row('الصيانة',(a.omMode||'new')==='new'?`عقد جديد · ${num(npVal(a,NP_STEPS.find(x=>x.id==='omM')))} ر.س للوحدة شهرياً`:a.omMode==='link'?`مربوط بعقد ${esc(Store.get('contracts',a.omLink)?.number||'—')}`:'لا يوجد حالياً'):''}${row('التكلفة الاستثمارية',`${num(a.inv||0)} ر.س`)}
       ${row('نموذج التشغيل',pick==='self'?'🏠 تشغيل ذاتي':`🤝 إسناد لمستثمر${a.investor?' · '+esc(a.investor):''}${a.offer?` · ${num(a.offer)} ر.س سنوياً`:''}`)}</div>
       <p class="small muted">سيُنشأ: مشروع واحد${a.bld?`، و${a.bld} مبنى`:''}، و${a.units||0} وحدة شاغرة، و${pick==='self'?'اتفاقية تشغيل ذاتي':'عقد إسناد لمستثمر'} مرتبطة بالمشروع.</p>`;
     st.pickNow=pick;
