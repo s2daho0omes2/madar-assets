@@ -494,7 +494,11 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 /* الخريطة التفاعلية: لوحة داكنة فوق صورة الأقمار الصناعية، وبطاقات مؤشرات فوق كل موقع */
 .gmap{position:relative;line-height:0;user-select:none;background:#1b232b}
 .gmap img{width:100%;height:auto;display:block;filter:grayscale(.75) brightness(.5) contrast(1.2)}
-.gmap img.dk{filter:none}
+.gmap img.dk{filter:none} .gmap img.sat{filter:brightness(.88) saturate(.95)}
+.gxlay{all:unset;box-sizing:border-box;position:absolute;bottom:16px;right:64px;z-index:6;width:78px;height:78px;border-radius:12px;border:3px solid #fff;background-size:cover;background-position:55% 50%;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.45);overflow:hidden;transition:transform .15s}
+.gxlay:hover{transform:scale(1.05)} .gxlay:focus-visible{outline:3px solid #d4ad74;outline-offset:2px}
+.gxlay span{position:absolute;inset:auto 0 0 0;background:linear-gradient(0deg,rgba(0,0,0,.8),rgba(0,0,0,0));color:#fff;font-size:11.5px;font-weight:800;text-align:center;padding:12px 2px 4px;line-height:1.2}
+.gx.mini .gxlay{right:16px;width:66px;height:66px} .gx.hasbar .gxlay{bottom:112px}
 .gxattr{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);z-index:6;font-size:10.5px;color:rgba(230,237,242,.55);pointer-events:none}
 .gmap::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:1;background:radial-gradient(ellipse at 50% 50%,rgba(8,12,16,0) 35%,rgba(8,12,16,.55) 100%)} .gx.edit .gmap{cursor:crosshair}
 .gx{position:relative;border-radius:18px;overflow:hidden;background:#141b22;color:#eef2f5;box-shadow:0 10px 30px rgba(0,0,0,.25)}

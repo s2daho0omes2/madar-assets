@@ -408,8 +408,8 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
     ${big('عقود تنتهي خلال 90 يوماً',ending.length,ending.length?'bad':'ok',ending.length?'تحتاج قراراً':'لا يوجد',ending.length?ending.map(x=>esc(nm(x))).join('، '):'كل العقود سارية لأكثر من 90 يوماً')}
   </div>
   <div class="gx mini mb"><div class="gxh"><div><h2>مواقع المشاريع <span>| ${GIS_BASE.name}</span></h2><div class="small">${gpins.length?'إيرادات كل موقع مقابل المستهدف · اضغط أي موقع لملخصه':'لم تُربط مواقع بعد'}</div></div><div class="gxtabs"><a class="on" href="#gis">${gpins.length?'فتح الخريطة الكاملة ←':'حدّد مواقع المشاريع ←'}</a></div></div>
-    <div class="gxv" id="dGxv"><div class="gmap" id="dMap"><img src="${GIS_BASE.src}" class="dk" alt="خريطة ${GIS_BASE.name}" draggable="false">${gpins.map(a=>gisPin(a)).join('')}</div></div>
-    <div class="gxattr">© OpenStreetMap</div><div class="gxleg"><span><i class="ok"></i>حقق المستهدف</span><span><i class="warn"></i>قريب منه</span><span><i class="bad"></i>دون المستهدف</span></div></div>
+    <div class="gxv" id="dGxv"><div class="gmap" id="dMap">${gisImg(GIS_BASE)}${gpins.map(a=>gisPin(a)).join('')}</div></div>
+    <div class="gxattr">${GIS_LAYERS[gisLayer()].attr}</div>${gisLayerBtn(GIS_BASE)}<div class="gxleg"><span><i class="ok"></i>حقق المستهدف</span><span><i class="warn"></i>قريب منه</span><span><i class="bad"></i>دون المستهدف</span></div></div>
 
   <div class="card mb"><div class="dah"><h3>التحليل المالي</h3><span class="small muted">قراءة المحلل: من أين يأتي الربح، وأين يتسرب، وأي مشروع يحمل المحفظة</span></div>
     <div class="dfin">
@@ -437,7 +437,7 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
     </div>
   </details>`;
   v.querySelectorAll('tr[data-go]').forEach(r=>r.onclick=()=>{ location.hash=r.dataset.go; });
-  gisFit($('#dGxv',v));
+  gisFit($('#dGxv',v)); gisBindLayer(v);
   v.querySelectorAll('#dMap .gpin').forEach(b=>b.onclick=()=>{ const a=Store.get('assets',b.dataset.id); Modal.open({title:esc(a.name),body:gisInfo(a),footer:`<button class="btn" onclick="Modal.close();location.hash='#gis'">فتح الخريطة</button><button class="btn p" id="gOpen">فتح ملف الأصل</button>`}); $('#gOpen').onclick=()=>{ Modal.close(); assetDetail(a); }; });
   const fade=c=>months.map((_,i)=>c+(i<nAct?'cc':'55'));
   const net=months.map((_,i)=>mSelfRev[i]+mInvRev[i]-mSelfExp[i]), st={scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,ticks:{callback:x=>short(x)}}}};
@@ -1367,7 +1367,16 @@ M.reports={key:'reports',label:'التقارير والتحليلات',icon:'�
 
 /* 11. الخرائط GIS */
 /* الخريطة: خريطة ينبع الصناعية مدمجة. انقر أي نقطة لربطها بمشروع موجود، وانقر الدبوس لعرض المشروع أو نقله */
-const GIS_BASE={id:'MAP-YANBU',name:'ينبع الصناعية',src:'assets/yanbu-dark.webp',builtin:true,dark:true}; // مرسومة من بيانات OpenStreetMap (ODbL)
+const GIS_BASE={id:'MAP-YANBU',name:'ينبع الصناعية',src:'assets/yanbu-dark.webp',builtin:true,dark:true};
+/* طبقات الخريطة الأساسية مثل قوقل ماب: خريطة داكنة (من OpenStreetMap) أو صورة قمر صناعي واقعية. الاختيار يُحفظ في هذا المتصفح */
+const GIS_LAYERS={dark:{l:'خريطة',src:'assets/yanbu-dark.webp',cls:'dk',attr:'© OpenStreetMap'},sat:{l:'قمر صناعي',src:'assets/yanbu-map.webp',cls:'sat',attr:'صورة قمر صناعي'}};
+const gisLayer=()=>GIS_LAYERS[ls.get('am_map_layer')]?ls.get('am_map_layer'):'dark';
+const gisImg=(mp,id='')=>{ const L=mp.builtin?GIS_LAYERS[gisLayer()]:null; return `<img ${id} data-base="${mp.builtin?1:''}" src="${L?L.src:mp.src}" class="${L?L.cls:''}" alt="خريطة ${esc(mp.name)}" draggable="false">`; };
+const gisLayerBtn=mp=>{ if(!mp.builtin) return ''; const o=gisLayer()==='dark'?'sat':'dark', L=GIS_LAYERS[o]; return `<button type="button" class="gxlay" data-lay="${o}" style="background-image:url('${L.src}')" aria-label="تغيير الطبقة إلى ${L.l}"><span>🗂 ${L.l}</span></button>`; };
+/* تبديل الطبقة في مكانه بدون إعادة رسم الصفحة */
+const gisBindLayer=root=>root.querySelectorAll('.gxlay').forEach(b=>b.onclick=e=>{ e.stopPropagation(); ls.set('am_map_layer',b.dataset.lay); const L=GIS_LAYERS[b.dataset.lay], o=b.dataset.lay==='dark'?'sat':'dark', O=GIS_LAYERS[o];
+  const gx=b.closest('.gx'); gx.querySelectorAll('img[data-base="1"]').forEach(i=>{ i.src=L.src; i.className=L.cls; }); const at=gx.querySelector('.gxattr'); if(at) at.textContent=L.attr;
+  b.dataset.lay=o; b.style.backgroundImage=`url('${O.src}')`; b.setAttribute('aria-label','تغيير الطبقة إلى '+O.l); b.querySelector('span').textContent='🗂 '+O.l; });
 const healthBadgeOf=a=>{ const k=agreementFor(a.id); return k&&k.assetId===a.id?healthBadge(k):''; };
 /* ملخص موقع على الخريطة: يُستخدم في صفحة الخريطة ولوحة التحكم */
 const gisTone=a=>{ const t=agreementFor(a.id)?.type; return t==='تشغيل ذاتي'?'self':t==='مستثمر'?'inv':'none'; };
@@ -1399,15 +1408,16 @@ M.gis={key:'gis',label:'الخريطة',icon:'🗺️',group:'متقدم',render
         <div class="gxtabs">${Object.entries(GIS_METRICS).map(([k,x])=>`<button class="${k===m?'on':''}" data-m="${k}">${x.l}</button>`).join('')}</div>
         ${mv?'<button class="btn sm" id="mvX">إلغاء النقل</button>':''}</div>
       <div class="gxk"><div class="l">${head[0]}</div><div class="v">${head[1]} <small>${head[2]}</small></div><div class="gxs"><div><b>${pins.length}</b><span>مواقع</span></div><div><b>${occP}%</b><span>إشغال</span></div><div><b>${short(tot.arr)}</b><span>متأخرات</span></div></div></div>
-      <div class="gxv" id="gxv"><div class="gmap" id="map" style="width:${gv.zoom*100}%"><img src="${mp.src}" class="${mp.dark?'dk':''}" alt="خريطة ${esc(mp.name)}" draggable="false">${pins.map(a=>gisPin(a,(a.id===moving?'mv ':'')+(a.id===gv.sel?'sel':''),m)).join('')}</div></div>
-      <div class="gxattr">© OpenStreetMap</div><div class="gxleg"><span><i class="ok"></i>حقق المستهدف</span><span><i class="warn"></i>قريب منه</span><span><i class="bad"></i>دون المستهدف</span></div>
-      <div class="gxz"><button data-z="1" aria-label="تكبير">+</button><button data-z="-1" aria-label="تصغير">−</button></div>
+      <div class="gxv" id="gxv"><div class="gmap" id="map" style="width:${gv.zoom*100}%">${gisImg(mp)}${pins.map(a=>gisPin(a,(a.id===moving?'mv ':'')+(a.id===gv.sel?'sel':''),m)).join('')}</div></div>
+      <div class="gxattr">${GIS_LAYERS[gisLayer()].attr}</div><div class="gxleg"><span><i class="ok"></i>حقق المستهدف</span><span><i class="warn"></i>قريب منه</span><span><i class="bad"></i>دون المستهدف</span></div>
+      ${gisLayerBtn(mp)}<div class="gxz"><button data-z="1" aria-label="تكبير">+</button><button data-z="-1" aria-label="تصغير">−</button></div>
       ${sel?`<div class="gxb"><div class="gxt"><i>${{project:'🏙️',district:'🏘️',building:'🏢'}[sel.level]||'📍'}</i><div><b>${esc(sel.name)}</b><span>${LEVELS[sel.level]} · ${ss.k?AG_LABEL[ss.k.type]:'بلا اتفاقية'}${sel.location?' · '+esc(sel.location):''}</span></div></div>
         <div class="gxbs"><div><span>الإشغال</span><b>${ss.occPct}%</b></div><div><span>الإيرادات</span><b>${ss.rev>=1e6?gisFmtM(ss.rev):Math.round(ss.rev/1e3).toLocaleString('en-US')} <small>${ss.rev>=1e6?'مليون':'ألف'}</small></b></div><div><span>من المستهدف</span><b class="${ss.revPct>=90?'ok':''}">${ss.revPct==null?'—':ss.revPct+'%'}</b></div><div><span>المتأخرات</span><b class="${ss.arr?'bad':''}">${num(ss.arr)} <small>ر.س</small></b></div></div>
         <div class="gxba">${can('edit')?`<button class="btn sm ghost" data-rm="${sel.id}">إزالة من الخريطة</button><button class="btn sm ghost" data-mv="${sel.id}">نقل النقطة</button>`:''}<button class="btn p" id="gOpen">تفاصيل الأصل ←</button></div></div>`:''}
     </div>
     <div class="toolbar" style="margin-top:12px"><select id="mapSel" style="width:auto">${maps.map(x=>`<option value="${x.id}" ${x.id===mp.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select><span class="small muted">${pins.length} موقع مربوط</span><span class="sp"></span>${can('edit')?`<label class="btn sm">📤 رفع خريطة أخرى<input type="file" accept="image/*" id="mapUp" class="hidden"></label>`:''}${!mp.builtin&&can('delete')?`<button class="btn d sm" id="mapDel">حذف الخريطة</button>`:''}</div>`;
     { const el=$('#gxv',v); if(gv.pos){ el.scrollLeft=gv.pos[0]; el.scrollTop=gv.pos[1]; const img=el.querySelector('img'); if(img&&!img.complete) img.addEventListener('load',()=>{ el.scrollLeft=gv.pos[0]; el.scrollTop=gv.pos[1]; },{once:true}); } else gisFit(el); el.onscroll=()=>{ gv.pos=[el.scrollLeft,el.scrollTop]; }; }
+    gisBindLayer(v);
     v.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{ gv.metric=b.dataset.m; draw(); });
     v.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{ const el=$('#gxv',v), cx=el.scrollLeft+el.clientWidth/2, cy=el.scrollTop+el.clientHeight/2, z0=gv.zoom; gv.zoom=Math.min(3,Math.max(1,z0+Number(b.dataset.z)*.5)); $('#map',v).style.width=gv.zoom*100+'%'; const r=gv.zoom/z0; el.scrollLeft=cx*r-el.clientWidth/2; el.scrollTop=cy*r-el.clientHeight/2; });
     $('#mapSel',v).onchange=e=>{ curMap=e.target.value; moving=null; gv.sel=null; draw(); };
