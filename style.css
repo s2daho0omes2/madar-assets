@@ -537,3 +537,23 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .wzlive>div:not(.small):not(.sub) b{font-size:16px} .wzlive .tot{background:var(--sand-2)!important}
 @media(max-width:760px){.wzside{display:flex!important;flex-direction:column}}
 .toolbar.wctr{justify-content:center;text-align:center} .toolbar.wctr .sp{display:none}
+
+/* بطاقة المشروع الموحدة وسطر الملخص */
+.agcard{cursor:default;display:flex;flex-direction:column;gap:12px;border-inline-start:0!important;border-top:5px solid var(--wood)} .agcard.inv{border-top-color:var(--sky)}
+.agcard:hover{transform:none}
+.agh2{display:flex;justify-content:space-between;align-items:flex-start;gap:10px} .agn b{font-size:18px;font-weight:800}
+.agp{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:10px;align-items:end}
+.agp span{display:block;font-size:12.5px;color:var(--muted)} .agp b{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+.agp>div:first-child b{font-size:clamp(28px,3vw,36px);line-height:1.1} .agp b.neg{color:var(--red)}
+.agl{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--muted);margin-top:-6px} .agl span{display:inline-flex;align-items:center;gap:6px}
+.agl i{width:9px;height:9px;border-radius:3px} .agl i.c{background:#8fa3b3} .agl i.a{background:#b9925a} .agl i.p{background:#4fae82}
+.ago{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;font-size:13px} .ago span{color:var(--muted)} .ago b{font-variant-numeric:tabular-nums}
+.agn2{display:flex;flex-direction:column;gap:5px;font-size:13.5px;line-height:1.6}
+.agn2>div{padding:6px 10px;border-radius:9px;background:var(--sand)} .agn2 .bad{background:var(--red-bg);color:var(--red)} .agn2 .warn{background:var(--amber-bg);color:var(--amber)} .agn2 .ok{background:var(--ok-bg);color:var(--ok)}
+.agmore{border-top:1px dashed var(--line);padding-top:8px} .agmore summary{cursor:pointer;font-size:13.5px;font-weight:700;color:var(--gold)} .agmore .mk{margin-top:10px}
+.aga{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:10px}
+.sumline{display:flex;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.sumline>div{flex:1 1 130px;padding:12px 16px;display:flex;flex-direction:column;gap:1px;border-inline-start:1px solid var(--line)} .sumline>div:first-child{border-inline-start:0}
+.sumline span{font-size:12.5px;color:var(--muted)} .sumline b{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums} .sumline small{font-size:12px;color:var(--muted)}
+.sumline .bad b{color:var(--red)}
+.sech{font-size:16px;margin:18px 2px 10px} .sech:first-child{margin-top:4px}
