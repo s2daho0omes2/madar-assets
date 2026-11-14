@@ -242,10 +242,30 @@ const Cloud={ base:'https://madar-assets-default-rtdb.europe-west1.firebasedatab
   link(){ return this.key?location.origin+location.pathname+'#k='+this.key:''; },
   async pull(){ const c=new AbortController(), t=setTimeout(()=>c.abort(),9000); try{ const r=await fetch(this.ep(),{cache:'no-store',signal:c.signal}); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); } finally{ clearTimeout(t); } },
   push(){ if(!this.key) return; this.dirty=true; this.set('saving'); clearTimeout(this.timer); this.timer=setTimeout(()=>this.flush(),700); },
-  async flush(keep){ if(!this.key||!this.dirty) return; this.dirty=false; try{ const r=await fetch(this.ep(),{method:'PUT',body:JSON.stringify(Store.data),keepalive:!!keep}); if(!r.ok) throw new Error('HTTP '+r.status); if(!this.dirty) this.set('saved'); }catch(e){ this.dirty=true; this.set('error'); } },
-  /* تحديث من جهاز آخر: يُفحص عند العودة للنافذة وكل دقيقة، ولا يُطبَّق إن كان عندك حفظ معلّق */
-  async check(){ if(!this.key||this.dirty||document.querySelector('.modal')) return; try{ const r=await fetch(this.ep('/_ts'),{cache:'no-store'}); if(!r.ok) return; const t=await r.json(); if(this.state==='error') this.set('saved');
-      if(t&&t>(Store.data._ts||0)){ const d=await this.pull(); if(d&&d.settings&&!this.dirty){ Store.data=Store.fix(d); Store.saveLocal(); App.render(); App.refreshBadges(); toast('حُمّل آخر تحديث من جهاز آخر'); } } }catch(e){} },
+  /* آخر نسخة متزامنة مع السيرفر: أساس الدمج الثلاثي (ما غيّرته أنت مقابل ما تغيّر على السيرفر) */
+  base:null, baseTs:0,
+  setBase(json,ts){ this.baseTs=ts||0; try{ this.base=JSON.parse(json); localStorage.setItem('am_db_base',json); }catch(e){ this.base=null; } },
+  loadBase(){ try{ const j=localStorage.getItem('am_db_base'); if(j){ this.base=JSON.parse(j); this.baseTs=this.base._ts||0; } }catch(e){} },
+  /* دمج: يبدأ من نسخة السيرفر، ثم يطبّق فقط ما غيّره هذا الجهاز منذ آخر مزامنة (إضافة، تعديل، حذف) سجلاً سجلاً */
+  merge(base,loc,rem){ base=base||{}; const out=JSON.parse(JSON.stringify(rem)), J=x=>JSON.stringify(x);
+    new Set([...Object.keys(loc),...Object.keys(rem)]).forEach(k=>{ if(k==='_ts') return; const b=base[k], l=loc[k], r=rem[k];
+      if(Array.isArray(l)||Array.isArray(r)){ const bm=new Map((b||[]).filter(x=>x&&x.id).map(x=>[x.id,J(x)])), lm=new Map((l||[]).filter(x=>x&&x.id).map(x=>[x.id,x]));
+        const res=new Map((r||[]).filter(x=>x&&x.id).map(x=>[x.id,x])), added=[];
+        lm.forEach((x,id)=>{ if(bm.get(id)!==J(x)){ if(!res.has(id)&&!bm.has(id)) added.push(x); res.set(id,x); } });
+        bm.forEach((_,id)=>{ if(!lm.has(id)) res.delete(id); });
+        const ord=[]; (r||[]).forEach(x=>{ if(x&&res.has(x.id)){ ord.push(res.get(x.id)); res.delete(x.id); } }); added.forEach(x=>{ if(res.has(x.id)){ ord.unshift(x); res.delete(x.id); } }); res.forEach(x=>ord.push(x)); out[k]=ord; }
+      else if(J(l)!==J(b)) out[k]=l; });
+    return out; },
+  async flush(keep){ if(!this.key||!this.dirty) return; this.dirty=false;
+    try{
+      if(!keep){ const rr=await fetch(this.ep('/_ts'),{cache:'no-store'}); const rt=rr.ok?await rr.json():null;
+        if(rt&&this.baseTs&&rt!==this.baseTs){ const remote=Store.fix(await this.pull()); if(remote&&remote.settings){ Store.data=this.merge(this.base,Store.data,remote); Store.data._ts=Date.now(); Store.saveLocal(); if(!document.querySelector('.modal')) App.render(); toast('دُمجت تعديلاتك مع تحديثات من جهاز آخر'); } } }
+      const body=JSON.stringify(Store.data); const r=await fetch(this.ep(),{method:'PUT',body,keepalive:!!keep&&body.length<60000}); if(!r.ok) throw new Error('HTTP '+r.status);
+      this.setBase(body,Store.data._ts); if(!this.dirty) this.set('saved');
+    }catch(e){ this.dirty=true; this.set('error'); } },
+  /* تحديث من جهاز آخر: يُفحص عند العودة للنافذة وكل 20 ثانية. إن كان عندك تعديل لم يُرفع فالدمج يتم عند الحفظ */
+  async check(){ if(!this.key||this.dirty) return; try{ const r=await fetch(this.ep('/_ts'),{cache:'no-store'}); if(!r.ok) return; const t=await r.json(); if(this.state==='error') this.set('saved');
+      if(t&&t!==this.baseTs&&t>(Store.data._ts||0)){ const d=await this.pull(); if(d&&d.settings&&!this.dirty){ Store.data=Store.fix(d); Store.saveLocal(); this.setBase(JSON.stringify(Store.data),Store.data._ts); if(!document.querySelector('.modal')){ App.render(); App.refreshBadges(); } toast('حُمّل آخر تحديث من جهاز آخر'); } } }catch(e){} },
   set(st){ this.state=st; const el=document.getElementById('cloudSt'); if(!el) return; const T={saved:['☁ محفوظ سحابياً','ok'],saving:['⟳ جارٍ الحفظ…','warn'],error:['⚠ غير متصل · محفوظ على الجهاز','bad'],local:['محفوظ على هذا الجهاز فقط','']}[st]; el.textContent=T[0]; el.className='cst '+T[1]; el.title=st==='local'?'افتح رابط النظام الخاص لتفعيل الحفظ السحابي':''; }
 };
 
@@ -1520,7 +1540,7 @@ function npCreate(a,model){ const all=Store.coll('assets'), yr=new Date().getFul
   const B=[...Array(Math.max(0,Math.round(a.bld||0)))].map((_,i)=>({id:gid(),code:`${code}-B${String(i+1).padStart(2,'0')}`,name:`عمارة ${i+1}`,level:'building',parentId:P.id,type:a.kind,location:a.city||'',condition:'جيد',status:'قيد التشغيل',...base}));
   /* الوحدات توزَّع على المباني بالتتابع (المبنى الأول يأخذ نصيبه كاملاً ثم الذي يليه)، وتُرقَّم داخل كل مبنى من 1 */
   const nU=Math.round(a.units), per=B.length?Math.floor(nU/B.length):0, extra=B.length?nU%B.length:0, U=[];
-  if(B.length) B.forEach((bl,bi)=>{ const cnt=per+(bi<extra?1:0); for(let j=1;j<=cnt;j++) U.push({id:gid(),code:`${bl.code}-U${String(j).padStart(2,'0')}`,name:`شقة ${j} - ${bl.name.replace('مبنى','عمارة')}`,level:'unit',parentId:bl.id,type:a.kind,location:a.city||'',condition:'جيد',status:'شاغر',occupancy:'شاغر',rent:Number(a.rent)||0,...base}); });
+  if(B.length) B.forEach((bl,bi)=>{ const cnt=per+(bi<extra?1:0); for(let j=1;j<=cnt;j++) U.push({id:gid(),code:`${bl.code}-U${String(j).padStart(2,'0')}`,name:`شقة ${bi+1}-${j}`,level:'unit',parentId:bl.id,type:a.kind,location:a.city||'',condition:'جيد',status:'شاغر',occupancy:'شاغر',rent:Number(a.rent)||0,...base}); });
   else for(let j=1;j<=nU;j++) U.push({id:gid(),code:`${code}-U${String(j).padStart(3,'0')}`,name:`وحدة ${j}`,level:'unit',parentId:P.id,type:a.kind,location:a.city||'',condition:'جيد',status:'شاغر',occupancy:'شاغر',rent:Number(a.rent)||0,...base});
   Store.data.assets=[P,...B,...U,...all];
   const alloc=Store.coll('contracts').find(k=>k.type==='تخصيص'), start=a.start||todayStr(), end=(()=>{ const d=new Date(start); d.setFullYear(d.getFullYear()+Math.round(a.years||10)); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); })();
@@ -1648,11 +1668,13 @@ const App={
     Store.load();
     if(Cloud.init()){ Cloud.set('saving');
       try{ const force=ls.get('am_push_next')==='1'; const d=force?null:await Cloud.pull();
-        if(d&&d.settings&&(d._ts||0)>=(Store.data._ts||0)){ Store.data=Store.fix(d); Store.saveLocal(); Cloud.set('saved'); }
-        else { try{ localStorage.removeItem('am_push_next'); }catch(e){} Store.data._ts=Store.data._ts||Date.now(); Cloud.dirty=true; await Cloud.flush(); } // أول جهاز: يرفع بياناته المحلية
+        Cloud.loadBase();
+        if(d&&d.settings&&(d._ts||0)>=(Store.data._ts||0)){ Store.data=Store.fix(d); Store.saveLocal(); Cloud.setBase(JSON.stringify(Store.data),Store.data._ts); Cloud.set('saved'); }
+        else if(d&&d.settings&&Cloud.base&&!force){ Store.data=Cloud.merge(Cloud.base,Store.data,Store.fix(d)); Store.data._ts=Date.now(); Store.saveLocal(); Cloud.baseTs=d._ts; Cloud.dirty=true; await Cloud.flush(); } // تعديلات محلية لم تُرفع: تُدمج
+        else { try{ localStorage.removeItem('am_push_next'); }catch(e){} Store.data._ts=Store.data._ts||Date.now(); Cloud.baseTs=0; Cloud.dirty=true; await Cloud.flush(); } // أول جهاز، أو استرجاع نسخة: يرفع بياناته
       }catch(e){ Cloud.set('error'); }
       addEventListener('focus',()=>Cloud.check()); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) Cloud.check(); else Cloud.flush(true); });
-      setInterval(()=>Cloud.check(),60000); addEventListener('pagehide',()=>Cloud.flush(true));
+      setInterval(()=>Cloud.check(),20000); addEventListener('pagehide',()=>Cloud.flush(true));
     } else Cloud.set('local');
     Store.syncSeed();
     const savedUser=ls.get('am_user')||'u1'; this.user=Store.get('users',savedUser)||Store.coll('users')[0];
