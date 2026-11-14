@@ -515,6 +515,47 @@ function renderTree(c){
   $('#colAll',c).onclick=()=>{ open.clear(); renderTree(c); };
   const b=$('#addA',c); if(b) b.onclick=()=>crud(assetCrudCfg(),document.createElement('div')).form(null);
 }
+/* ───── تأجير الوحدة وإخلاؤها: خطوة واحدة بدل ثلاث (ملف المستأجر + حالة الوحدة + جدول الأقساط) ───── */
+const LEASE_PER={1:'شهري',3:'ربع سنوي',6:'نصف سنوي',12:'سنوي'};
+function leaseUnit(a,done){
+  const today=todayStr();
+  Modal.open({title:`تأجير ${esc(a.name)}`,body:`<div class="form">
+    <div class="f full"><label>اسم المستأجر *</label><input id="lsN" placeholder="الاسم الكامل"></div>
+    <div class="f"><label>رقم الهوية</label><input id="lsI" inputmode="numeric" dir="ltr"></div>
+    <div class="f"><label>الجوال</label><input id="lsP" inputmode="tel" dir="ltr" placeholder="05xxxxxxxx"></div>
+    <div class="f"><label>الإيجار السنوي (ر.س) *</label><input id="lsR" type="number" min="0" value="${Number(a.rent)||''}"></div>
+    <div class="f"><label>بداية العقد *</label><input id="lsS" type="date" value="${today}"></div>
+    <div class="f"><label>مدة العقد</label><select id="lsM"><option value="12" selected>سنة</option><option value="24">سنتان</option><option value="36">3 سنوات</option><option value="6">6 أشهر</option></select></div>
+    <div class="f"><label>طريقة الدفع</label><select id="lsQ">${Object.entries(LEASE_PER).map(([k,l])=>`<option value="${k}" ${k==='3'?'selected':''}>${l}</option>`).join('')}</select></div>
+  </div><div class="small muted" id="lsSum" style="margin-top:10px"></div>`,
+  footer:`<button class="btn" onclick="Modal.close()">إلغاء</button><button class="btn p" id="lsOk">تأجير</button>`});
+  const sumUp=()=>{ const r=Number($('#lsR').value)||0, m=Number($('#lsM').value), q=Number($('#lsQ').value), n=Math.max(1,Math.round(m/q)); $('#lsSum').textContent=r?`سيُنشأ ${n} ${n===1?'قسط':'أقساط'} بقيمة ${Math.round(r*q/12).toLocaleString('en-US')} ر.س، أولها في ${$('#lsS').value||'—'}.`:''; };
+  ['lsR','lsS','lsM','lsQ'].forEach(id=>$('#'+id).addEventListener('input',sumUp)); sumUp();
+  $('#lsOk').onclick=()=>{ const name=$('#lsN').value.trim(), rent=Number($('#lsR').value)||0, start=$('#lsS').value, m=Number($('#lsM').value), q=Number($('#lsQ').value);
+    if(!name) return toast('اكتب اسم المستأجر'); if(!(rent>0)) return toast('اكتب الإيجار السنوي'); if(!start) return toast('حدد بداية العقد');
+    const end=(()=>{ const d=new Date(start); d.setMonth(d.getMonth()+m); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); })();
+    const c=Store.add('clients',{name,idNo:$('#lsI').value.trim(),phone:$('#lsP').value.trim(),email:'',kind:'مستأجر',assetId:a.id,status:'نشط',leaseStart:start,leaseEnd:end,notes:''});
+    const k=agreementFor(a.id), n=Math.max(1,Math.round(m/q)), amt=Math.round(rent*q/12), P=Store.coll('payments');
+    for(let i=0;i<n;i++){ const d=new Date(start); d.setMonth(d.getMonth()+i*q); P.push({id:`PY-${c.id}-${i+1}`,clientId:c.id,assetId:a.id,contractId:k?.id||'',seq:i+1,dueDate:d.toISOString().slice(0,10),amount:amt,paid:0,paidDate:'',method:''}); }
+    Store.update('assets',a.id,{occupancy:'مشغول',status:'مؤجر',tenantId:c.id,rent});
+    Store.log('تأجير','assets',a.id,`${a.name} مؤجرة لـ${name} من ${start} إلى ${end}، ${n} أقساط × ${amt}`); Store.save();
+    Modal.close(); toast(`أُجّرت ${a.name}`); done&&done(); };
+}
+function vacateUnit(a,done){
+  const c=a.tenantId&&Store.get('clients',a.tenantId), today=todayStr(), P=paysOfAsset(a.id).filter(p=>!c||p.clientId===c.id);
+  Modal.open({title:`إخلاء ${esc(a.name)}`,body:`<div class="form"><div class="f"><label>تاريخ الإخلاء</label><input id="vcD" type="date" value="${today}"></div></div>
+    <p class="small muted" style="margin-top:8px">${c?`المستأجر: <b>${esc(c.name)}</b>. `:''}الأقساط غير المسددة التي يحل موعدها بعد تاريخ الإخلاء تُحذف لأنها لم تعد مستحقة. الأقساط السابقة غير المسددة تبقى متأخرات على المستأجر حتى تُحصَّل.</p><div class="small" id="vcSum" style="margin-top:6px"></div>`,
+    footer:`<button class="btn" onclick="Modal.close()">إلغاء</button><button class="btn d" id="vcOk">إخلاء</button>`});
+  const sumUp=()=>{ const d=$('#vcD').value, fut=P.filter(p=>p.dueDate>d&&!(Number(p.paid)>0)), owed=P.filter(p=>p.dueDate<=d).reduce((t,p)=>t+Math.max(0,(Number(p.amount)||0)-(Number(p.paid)||0)),0);
+    $('#vcSum').textContent=`${fut.length?`سيُحذف ${fut.length===1?'قسط مستقبلي واحد':fut.length===2?'قسطان مستقبليان':fut.length+' أقساط مستقبلية'}`:'لا توجد أقساط مستقبلية للحذف'}${owed?`، وتبقى متأخرات ${owed.toLocaleString('en-US')} ر.س`:'، ولا توجد متأخرات'}.`; };
+  $('#vcD').addEventListener('input',sumUp); sumUp();
+  $('#vcOk').onclick=()=>{ const d=$('#vcD').value||today, drop=new Set(P.filter(p=>p.dueDate>d&&!(Number(p.paid)>0)).map(p=>p.id));
+    Store.data.payments=Store.coll('payments').filter(p=>!drop.has(p.id));
+    if(c) Store.update('clients',c.id,{status:'منتهي',leaseEnd:d});
+    Store.update('assets',a.id,{occupancy:'شاغر',status:'شاغر',tenantId:''});
+    Store.log('إخلاء','assets',a.id,`إخلاء ${a.name}${c?' من '+c.name:''} بتاريخ ${d}، حُذف ${drop.size} قسط مستقبلي`); Store.save();
+    Modal.close(); toast(`أُخليت ${a.name}`); done&&done(); };
+}
 function assetDetail(a){
   if(!a) return;
   const kids=descendants(a.id), ids=new Set([a.id,...kids.map(k=>k.id)]);
@@ -555,11 +596,13 @@ function assetDetail(a){
     return `<div class="small muted" style="margin-bottom:8px">كل ما يقع تحت ${esc(a.name)} في الهيكل: ${cnt}. اضغط على أي أصل لفتحه.</div><div class="twrap"><table class="tbl"><thead><tr><th>الأصل</th><th>الرمز</th><th>المستوى</th><th>الحالة الفنية</th><th>الإشغال</th><th>القيمة</th></tr></thead><tbody>${kids.map(x=>{ const dp=ancestorsOf(x.id).length-base-1; return `<tr class="clk" data-go="${x.id}"><td><span class="kidrow" style="padding-inline-start:${dp*22}px">${dp?'<span class="kidln">┘</span>':''}${ICO[x.level]||''} ${esc(x.name)}</span></td><td class="small muted">${esc(x.code)}</td><td>${LEVELS[x.level]}</td><td>${pill(x.condition)}</td><td>${x.level==='unit'?pill(x.occupancy||'—'):'—'}</td><td>${money(x.value)}</td></tr>`; }).join('')}</tbody></table></div>`; })()}</div>
   <div data-p="qr" class="hidden" style="text-align:center"><div class="qr" id="qrbox"></div><p class="small muted" style="margin-top:8px">امسح الرمز لفتح بيانات الأصل وسجل صيانته<br><span class="num">${esc(location.origin+location.pathname)}#asset-${a.id}</span></p>${IN_FRAME?'':'<button class="btn" onclick="window.print()">🖨 طباعة الملصق</button>'}</div>
   <div data-p="log" class="hidden">${auditHtml('assets',a.id)}</div>`;
-  Modal.open({title:`${LEVELS[a.level]}: ${esc(a.name)}`,body,wide:true,footer:`${can('edit')?`<button class="btn" id="editA">✎ تعديل</button>`:''}<button class="btn" onclick="Modal.close()">إغلاق</button>`});
+  Modal.open({title:`${LEVELS[a.level]}: ${esc(a.name)}`,body,wide:true,footer:`${can('edit')&&a.level==='unit'&&!isInv?(a.occupancy==='مشغول'?'<button class="btn d" id="vacA">إخلاء الوحدة</button>':'<button class="btn p" id="leaseA">تأجير الوحدة</button>'):''}${can('edit')?`<button class="btn" id="editA">✎ تعديل</button>`:''}<button class="btn" onclick="Modal.close()">إغلاق</button>`});
   const root=$('#modalRoot');
   root.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{ root.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); root.querySelectorAll('[data-p]').forEach(p=>p.classList.toggle('hidden',p.dataset.p!==b.dataset.t)); if(b.dataset.t==='qr'&&!$('#qrbox').children.length&&window.QRCode) new QRCode($('#qrbox'),{text:`${location.origin}${location.pathname}#asset-${a.id}`,width:180,height:180}); });
   root.querySelectorAll('[data-go]').forEach(x=>x.onclick=e=>{ e.preventDefault(); assetDetail(Store.get('assets',x.dataset.go)); });
   const e=$('#editA'); if(e) e.onclick=()=>crud(assetCrudCfg(),document.createElement('div')).form(a);
+  const reopen=()=>{ App.render(); App.refreshBadges(); assetDetail(Store.get('assets',a.id)); };
+  if($('#leaseA')) $('#leaseA').onclick=()=>leaseUnit(a,reopen); if($('#vacA')) $('#vacA').onclick=()=>vacateUnit(a,reopen);
   bindPayTable(root,()=>{ App.render(); assetDetail(Store.get('assets',a.id)); });
   root.querySelectorAll('.reqbox[data-req]').forEach(b=>b.onclick=()=>reqEditor(b.dataset.req,()=>{ App.render(); }));
 }
