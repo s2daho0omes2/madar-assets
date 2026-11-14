@@ -568,3 +568,5 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .drow.info .dn{background:var(--sand-2);color:var(--muted)}
 
 .dfin{align-items:start}
+
+.ltb td{vertical-align:top;font-size:13.5px} .ltb b.neg{color:var(--red)}
