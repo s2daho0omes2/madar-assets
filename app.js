@@ -1945,7 +1945,7 @@ M.system={key:'system',label:'الإعدادات والنسخ',icon:'⚙️',gro
   $('#sv',v).onclick=()=>{ Store.data.settings.projectName=$('#pn',v).value; Store.data.settings.currency=$('#cur',v).value; Store.data.settings.staffMonthly=Math.max(0,Number($('#stf',v).value)||0); Store.data.settings.turnoverPct=Math.max(0,Math.min(100,Number($('#tov',v).value)||0)); Store.data.settings.vacancyMonths=Math.max(0,Math.min(12,Number($('#vmo',v).value)||0)); Store.data.settings.vacateCost=Math.max(0,Number($('#vcs',v).value)||0); Store.save(); toast('تم الحفظ'); };
   $('#ex',v).onclick=()=>Store.export(); $('#im',v).onchange=e=>e.target.files[0]&&Store.import(e.target.files[0]);
   if($('#clCopy',v)) $('#clCopy',v).onclick=()=>{ const L=Cloud.link(); (navigator.clipboard?navigator.clipboard.writeText(L):Promise.reject()).then(()=>toast('نُسخ الرابط')).catch(()=>Modal.open({title:'الرابط الخاص',body:`<textarea readonly dir="ltr" style="width:100%;height:90px">${L}</textarea>`,footer:'<button class="btn" onclick="Modal.close()">إغلاق</button>'})); };
-  if($('#clOff',v)) $('#clOff',v).onclick=()=>ask('سيتوقف هذا الجهاز عن الحفظ السحابي، وتبقى نسخته المحلية. البيانات على السيرفر لا تُحذف.',()=>{ try{ localStorage.removeItem('am_cloud_key'); }catch(e){} location.reload(); },'إيقاف');
+  if($('#clOff',v)) $('#clOff',v).onclick=()=>ask('سيُفصل هذا الجهاز عن بيانات الشركة ويطلب الرابط الخاص عند الفتح القادم. البيانات على السيرفر لا تُحذف.',()=>{ ['am_cloud_key','am_db_v1','am_db_base'].forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} }); location.reload(); },'فصل الجهاز');
   if($('#clOn',v)) $('#clOn',v).onclick=()=>{ const m=$('#clIn',v).value.match(/([a-f0-9]{24,})/); if(!m) return toast('الرابط غير صحيح'); ls.set('am_cloud_key',m[1]); location.reload(); };
   v.querySelectorAll('[data-rs]').forEach(b=>b.onclick=()=>ask(`سترجع البيانات إلى نسخة ${b.dataset.rs}، وتُحفظ الحالة الحالية احتياطاً.`,()=>{ if(Store.restore(b.dataset.rs)) location.reload(); else toast('تعذر الاسترجاع'); },'استرجاع'));
   $('#rs',v).onclick=()=>ask('سيتم حذف كل البيانات المحلية وإعادة البيانات التجريبية.',()=>{ Store.reset(); location.reload(); },'إعادة البيانات');
@@ -1955,6 +1955,17 @@ M.system={key:'system',label:'الإعدادات والنسخ',icon:'⚙️',gro
 const NAV_ORDER=['dashboard','whatif','cashflow','agreements','alerts','operations','investor','assets','documents','contracts','finance','users','reports','gis','system'];
 const App={
   user:null,
+  /* جهاز بلا رابط خاص: لا تُعرض بيانات تجريبية. يُطلب الرابط مرة واحدة ثم يُحفظ في هذا المتصفح */
+  lock(){ document.body.innerHTML=`<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--bg,#f3f1ec);font-family:Tajawal,sans-serif" dir="rtl"><div class="card" style="max-width:460px;width:100%;text-align:center;padding:28px">
+      <h2 style="margin:0 0 6px">مدار الأصول</h2><p class="muted" style="margin:0 0 18px">هذا الجهاز غير مربوط ببيانات الشركة بعد.</p>
+      <p style="margin:0 0 10px;text-align:right">الصق الرابط الخاص الذي وصلك مرة واحدة فقط، وبعدها يفتح الموقع مباشرة من هذا الجهاز.</p>
+      <input id="lkIn" placeholder="الصق الرابط الخاص هنا" style="width:100%;direction:ltr;text-align:left" autocomplete="off">
+      <div id="lkMsg" class="small" style="color:#b23b2e;min-height:20px;margin:8px 0"></div>
+      <button class="btn p" id="lkGo" style="width:100%">دخول</button></div></div>`;
+    const go=async()=>{ const m=$('#lkIn').value.match(/([a-f0-9]{24,})/), msg=$('#lkMsg'); if(!m){ msg.textContent='الرابط غير صحيح. انسخه كاملاً كما وصلك.'; return; }
+      msg.textContent='جارٍ التحقق…'; try{ const r=await fetch(Cloud.url+m[1]+'/settings.json',{cache:'no-store'}); const j=r.ok?await r.json():null; if(!j){ msg.textContent='الرابط غير صحيح أو لا يملك صلاحية.'; return; }
+        ['am_db_v1','am_db_base'].forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} }); ls.set('am_cloud_key',m[1]); location.reload(); }catch(e){ msg.textContent='تعذر الاتصال. تحقق من الإنترنت وحاول مرة أخرى.'; } };
+    $('#lkGo').onclick=go; $('#lkIn').onkeydown=e=>{ if(e.key==='Enter') go(); }; },
   async init(){
     Store.load();
     if(Cloud.init()){ Cloud.set('saving');
@@ -1962,11 +1973,12 @@ const App={
         Cloud.loadBase();
         if(d&&d.settings&&(d._ts||0)>=(Store.data._ts||0)){ Store.data=Store.fix(d); Store.saveLocal(); Cloud.setBase(JSON.stringify(Store.data),Store.data._ts); Cloud.ready=true; Cloud.set('saved'); }
         else if(d&&d.settings&&Cloud.base&&!force){ Store.data=Cloud.merge(Cloud.base,Store.data,Store.fix(d)); Store.data._ts=Date.now(); Store.saveLocal(); Cloud.baseTs=d._ts; Cloud.ready=true; Cloud.dirty=true; await Cloud.flush(); } // تعديلات محلية لم تُرفع: تُدمج
+        else if(d&&d.settings&&!force){ Store.data=Store.fix(d); Store.saveLocal(); Cloud.setBase(JSON.stringify(Store.data),Store.data._ts); Cloud.ready=true; Cloud.set('saved'); } // بيانات محلية لم تُربط بالسيرفر قط (نسخة تجريبية قديمة): نسخة السيرفر هي المعتمدة
         else { try{ localStorage.removeItem('am_push_next'); }catch(e){} Store.data._ts=Store.data._ts||Date.now(); Cloud.baseTs=0; Cloud.ready=true; Cloud.dirty=true; await Cloud.flush(); } // أول جهاز، أو استرجاع نسخة: يرفع بياناته
       }catch(e){ Cloud.ready=false; Cloud.set('error'); setTimeout(()=>Cloud.reconnect(),3000); }
       addEventListener('focus',()=>Cloud.check()); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) Cloud.check(); else Cloud.flush(true); });
       setInterval(()=>Cloud.check(),20000); addEventListener('pagehide',()=>Cloud.flush(true));
-    } else Cloud.set('local');
+    } else if(!/[?&]local\b/.test(location.search)){ App.lock(); return; } else Cloud.set('local');
     Store.syncSeed();
     const savedUser=ls.get('am_user')||'u1'; this.user=Store.get('users',savedUser)||Store.coll('users')[0];
     const us=$('#userSel'); us.innerHTML=Store.coll('users').map(u=>`<option value="${u.id}" ${u.id===this.user.id?'selected':''}>${esc(u.name)} — ${ROLES[u.role]}</option>`).join('');
