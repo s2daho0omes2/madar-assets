@@ -339,6 +339,18 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
   const ending=inv.filter(x=>x.daysLeft!=null&&x.daysLeft<=90), R=Store.coll('requirements').filter(r=>inv.some(x=>x.k.id===r.contractId)), rq=reqStats(R);
   const obs=obsStats(Store.coll('observations').filter(o=>omContracts().some(k=>k.id===o.contractId)));
   const share=x=>PM.profit>0?`يساهم بـ${per(x,PM.profit)}% من ربح المحفظة`:'';
+  /* بيانات التحليل المالي */
+  const fin=(()=>{ const liveSelf=self.filter(x=>x.live), cats={}; Store.coll('finance').filter(f=>f.kind==='مصروف'&&liveSelf.some(x=>x.k.id===(f.contractId||agreementFor(f.assetId)?.id))).forEach(f=>{ const c=String(f.category||'أخرى').replace(/\s*\(.*\)/,''); cats[c]=(cats[c]||0)+Number(f.amount); });
+    const catList=Object.entries(cats).sort((a,b)=>b[1]-a[1]), pay=PM.pay, profit=PM.profit, top=catList[0];
+    const proj=all.filter(x=>x.live).map(x=>{ const inc=x.k.type==='مستثمر'?x.due:x.rev; return {l:assetPlain(x.k.assetId),inc,cost:x.k.type==='مستثمر'?0:x.exp,pay:x.pay,profit:x.profit,margin:inc?x.profit/inc*100:0,units:x.units,occ:x.occ,inv:x.k.type==='مستثمر'}; });
+    const ue=proj.filter(p=>p.occ).map(p=>({l:p.l,inc:p.inc/p.occ/12,cost:p.cost/p.occ/12,pay:p.pay/p.occ/12,net:p.profit/p.occ/12}));
+    const best=proj.slice().sort((a,b)=>b.margin-a.margin)[0], worst=proj.slice().sort((a,b)=>a.margin-b.margin)[0];
+    const netM=months.map((_,i)=>mSelfRev[i]+mInvRev[i]-mSelfExp[i]), half=Math.floor(netM.length/2), h1=netM.slice(0,half).reduce((t,x)=>t+x,0), h2=netM.slice(half).reduce((t,x)=>t+x,0);
+    return {catList,
+      wfNote:gross?`من كل 100 ريال: ${Math.round(sum(catList.map(c=>({v:c[1]})),'v')/gross*100)} تكاليف تشغيل، ${Math.round(pay/gross*100)} للهيئة الملكية، و${Math.round(profit/gross*100)} ربح.${top?` أكبر بند تكلفة: ${top[0]} (${short(top[1])}، ${Math.round(top[1]/gross*100)}% من الدخل).`:''}`:'لا يوجد دخل مسجل.',
+      proj, pjNote:proj.length>1?`${best.l} الأعلى هامشاً (${Math.round(best.margin)}%)، و${worst.l} الأدنى (${Math.round(worst.margin)}%). ${proj.find(p=>p.inv)&&proj.find(p=>!p.inv)?'الإسناد يحقق هامشاً أعلى لأنه بلا تكاليف تشغيل، والتشغيل الذاتي يحقق ربحاً أكبر لكل وحدة إن ارتفع الإشغال.':''}`:proj.length?`${best.l}: هامش ${Math.round(best.margin)}%.`:'لا توجد مشاريع سارية.',
+      ue, ueNote:ue.length?ue.map(u=>`${u.l}: كل وحدة مؤجرة تترك ${short(Math.round(u.net))} ر.س شهرياً من ${short(Math.round(u.inc))}`).join(' · '):'لا توجد وحدات مؤجرة.',
+      trNote:netM.some(x=>x)?(h2>=h1?`الصافي في النصف الأخير من السنة ${short(h2)} مقابل ${short(h1)} قبله: اتجاه تحسن.`:`الصافي في النصف الأخير ${short(h2)} مقابل ${short(h1)} قبله: اتجاه تراجع يستحق المراجعة.`):'لا توجد قيود شهرية بعد.'}; })();
   const gpins=Store.coll('assets').filter(a=>a.x!=null&&a.y!=null&&a.mapId===GIS_BASE.id);
   const occP=pct(PM.occ,PM.units), big=(l,val,cls,word,note)=>`<div class="dk"><div class="l">${l}</div><div class="v">${val}</div><span class="pill ${cls}">${word}</span><div class="s">${note}</div></div>`;
   /* كل خانة تُقسم حسب مصدرها: التشغيل الذاتي والإسناد لمستثمر */
@@ -374,6 +386,14 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
     <div class="gmap" id="dMap"><img src="${GIS_BASE.src}" alt="خريطة ${GIS_BASE.name}" draggable="false">${gpins.map(a=>gisPin(a)).join('')}</div>
     <div class="gleg"><span><i class="self"></i>تشغيل ذاتي</span><span><i class="inv"></i>إسناد لمستثمر</span><span><i class="none"></i>بلا اتفاقية</span></div></div>
 
+  <div class="card mb"><div class="dah"><h3>التحليل المالي</h3><span class="small muted">قراءة المحلل: من أين يأتي الربح، وأين يتسرب، وأي مشروع يحمل المحفظة</span></div>
+    <div class="dfin">
+      <div class="dfc wide"><div class="dft">من الدخل إلى صافي الربح <span>سنوياً</span></div><div class="chart" style="height:300px"><canvas id="cWf"></canvas></div><div class="dfn">${esc(fin.wfNote)}</div></div>
+      <div class="dfc"><div class="dft">ربحية كل مشروع <span>الربح والهامش</span></div><div class="chart" style="height:280px"><canvas id="cPj"></canvas></div><div class="dfn">${esc(fin.pjNote)}</div></div>
+      <div class="dfc"><div class="dft">اقتصاديات الوحدة <span>شهرياً لكل وحدة مؤجرة</span></div><div class="chart" style="height:280px"><canvas id="cUe"></canvas></div><div class="dfn">${esc(fin.ueNote)}</div></div>
+      <div class="dfc wide"><div class="dft">الدخل المحصّل والتكاليف شهرياً <span>آخر 12 شهراً، والخط هو الصافي</span></div><div class="chart" style="height:260px"><canvas id="c1"></canvas></div><div class="dfn">${esc(fin.trNote)}</div></div>
+    </div></div>
+
   <div class="dtier">تفاصيل أخرى</div>
   <details class="card mb" id="dTbl"><summary><b>كل الاتفاقيات</b> <span class="small muted">الربح والصحة وموعد الانتهاء لكل اتفاقية</span></summary>
     <div class="twrap" style="margin-top:12px"><table class="tbl dlg"><thead><tr><th>الاتفاقية</th><th>النموذج</th><th>الصحة</th><th>الدخل</th><th>للهيئة الملكية</th><th>الربح</th><th>تنتهي بعد</th></tr></thead><tbody>
@@ -381,7 +401,6 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
     </tbody></table></div></details>
   <details class="card" id="dMore"><summary><b>الرسوم والتحليلات</b> <span class="small muted">الدخل الشهري، التدفق المتوقع، المتأخرات، انتهاء العقود، وكل التنبيهات</span></summary>
     <div class="grid g2" style="margin-top:14px">
-      <div><h3>الدخل والتكاليف شهرياً</h3><div class="chart"><canvas id="c1"></canvas></div></div>
       <div><h3>التدفق النقدي المتوقع (3 أشهر)</h3><div class="chart"><canvas id="cf"></canvas></div></div>
       <div><h3>أعمار متأخرات المستأجرين</h3>${PM.arrears?`<div class="chart" style="height:220px"><canvas id="cag"></canvas></div>`:'<div class="empty">لا توجد متأخرات</div>'}</div>
       <div><h3>الدخل الذي تنتهي عقوده كل سنة</h3><div class="chart" style="height:220px"><canvas id="cex"></canvas></div></div>
@@ -396,8 +415,22 @@ M.dashboard={key:'dashboard',label:'لوحة التحكم',icon:'📊',group:'ا
   v.querySelectorAll('tr[data-go]').forEach(r=>r.onclick=()=>{ location.hash=r.dataset.go; });
   v.querySelectorAll('#dMap .gpin').forEach(b=>b.onclick=()=>{ const a=Store.get('assets',b.dataset.id); Modal.open({title:esc(a.name),body:gisInfo(a),footer:`<button class="btn" onclick="Modal.close();location.hash='#gis'">فتح الخريطة</button><button class="btn p" id="gOpen">فتح ملف الأصل</button>`}); $('#gOpen').onclick=()=>{ Modal.close(); assetDetail(a); }; });
   const net=months.map((_,i)=>mSelfRev[i]+mInvRev[i]-mSelfExp[i]), st={scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,ticks:{callback:x=>short(x)}}}};
+  const money=x=>short(x), tipMoney={rtl:true,callbacks:{label:c=>` ${c.dataset.label||c.label}: ${Math.round(Array.isArray(c.raw)?c.raw[1]-c.raw[0]:c.raw).toLocaleString('en-US')} ر.س`}};
+  { // شلال الربح
+    const L=['الدخل'], D=[], C=[]; let lvl=gross; D.push([0,gross]); C.push('#2f7d5b');
+    fin.catList.forEach(([n,a])=>{ L.push(n); D.push([lvl-a,lvl]); C.push('#c25a4a'); lvl-=a; });
+    L.push('الهيئة الملكية'); D.push([lvl-PM.pay,lvl]); C.push('#b9925a'); lvl-=PM.pay; L.push('صافي الربح'); D.push([0,lvl]); C.push(lvl>=0?'#16242f':'#8e2b22');
+    Charts.make('cWf','bar',L,[{label:'المبلغ',data:D,backgroundColor:C,borderColor:C,borderRadius:6}],{plugins:{legend:{display:false},tooltip:tipMoney},scales:{x:{grid:{display:false},ticks:{autoSkip:false,maxRotation:0,callback:function(v){ const t=this.getLabelForValue(v); return t.length>14?t.split(' ').reduce((a,w)=>{ const l=a[a.length-1]; if((l+' '+w).length>14) a.push(w); else a[a.length-1]=(l?l+' ':'')+w; return a; },['']):t; }}},y:{beginAtZero:true,ticks:{callback:money}}}});
+  }
+  if(fin.proj.length) Charts.make('cPj','bar',fin.proj.map(p=>p.l),[
+    {label:'الدخل',data:fin.proj.map(p=>Math.round(p.inc)),color:'#8fa3b3'},{label:'صافي الربح',data:fin.proj.map(p=>Math.round(p.profit)),color:'#2f7d5b'},
+    {label:'الهامش %',data:fin.proj.map(p=>Math.round(p.margin)),type:'line',yAxisID:'y1',color:'#b9925a',backgroundColor:'#b9925a',pointRadius:6,borderWidth:0,showLine:false}],
+    {plugins:{legend:{position:'top',rtl:true,labels:{usePointStyle:true}},tooltip:{rtl:true,callbacks:{label:c=>c.dataset.yAxisID==='y1'?` الهامش: ${c.raw}%`:` ${c.dataset.label}: ${Number(c.raw).toLocaleString('en-US')} ر.س`}}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,ticks:{callback:money}},y1:{position:'right',beginAtZero:true,max:100,grid:{display:false},ticks:{callback:x=>x+'%'}}}});
+  if(fin.ue.length) Charts.make('cUe','bar',fin.ue.map(u=>u.l),[
+    {label:'تكاليف التشغيل',data:fin.ue.map(u=>Math.round(u.cost)),color:'#c25a4a',stack:'u'},{label:'الهيئة الملكية',data:fin.ue.map(u=>Math.round(u.pay)),color:'#b9925a',stack:'u'},{label:'صافي الربح',data:fin.ue.map(u=>Math.round(Math.max(0,u.net))),color:'#2f7d5b',stack:'u'}],
+    {indexAxis:'y',plugins:{legend:{position:'top',rtl:true,labels:{usePointStyle:true}},tooltip:{rtl:true,callbacks:{label:c=>` ${c.dataset.label}: ${Number(c.raw).toLocaleString('en-US')} ر.س شهرياً`}}},scales:{x:{stacked:true,beginAtZero:true,ticks:{callback:money}},y:{stacked:true,grid:{display:false}}}});
+  Charts.make('c1','bar',months,[{label:'دخل التشغيل الذاتي',data:mSelfRev,color:COLORS[2],stack:'r'},{label:'دفعات المستثمرين',data:mInvRev,color:COLORS[3],stack:'r'},{label:'تكاليف التشغيل الذاتي',data:mSelfExp,color:COLORS[5],stack:'e'},{label:'الصافي',data:net,type:'line',stack:'n',color:'#b9925a',backgroundColor:'transparent',pointRadius:2,borderWidth:2.5}],st);
   let drawn=false; $('#dMore',v).addEventListener('toggle',e=>{ if(!e.target.open||drawn) return; drawn=true;
-    Charts.make('c1','bar',months,[{label:'دخل التشغيل الذاتي',data:mSelfRev,color:COLORS[2],stack:'r'},{label:'دفعات المستثمرين',data:mInvRev,color:COLORS[3],stack:'r'},{label:'تكاليف التشغيل الذاتي',data:mSelfExp,color:COLORS[5],stack:'e'},{label:'الصافي',data:net,type:'line',stack:'n',color:'#b9925a',backgroundColor:'transparent',pointRadius:2,borderWidth:2.5}],st);
     Charts.make('cf','bar',PM.cf.map(x=>x.mo),[{label:'أقساط المستأجرين',data:PM.cf.map(x=>Math.round(x.tenants)),color:COLORS[2],stack:'in'},{label:'دفعات المستثمرين',data:PM.cf.map(x=>Math.round(x.invIn)),color:COLORS[3],stack:'in'},{label:'الهيئة الملكية',data:PM.cf.map(x=>Math.round(x.auth)),color:COLORS[5],stack:'out'},{label:'المقاولون',data:PM.cf.map(x=>Math.round(x.om)),color:COLORS[1],stack:'out'}],st);
     if(PM.arrears) Charts.make('cag','bar',PM.aging.map(b=>b[0]),[{label:'المتأخر',data:PM.aging.map(b=>b[1]),backgroundColor:['#e0b85acc','#d98a3dcc','#c25a4acc','#8e2b22cc'],borderColor:['#e0b85a','#d98a3d','#c25a4a','#8e2b22']}],{plugins:{legend:{display:false}}});
     const ey=Object.keys(PM.expiry).sort(); Charts.make('cex','bar',ey,[{label:'عقود إيجار',data:ey.map(y=>PM.expiry[y].lease),color:COLORS[2],stack:'e'},{label:'عقود مستثمرين',data:ey.map(y=>PM.expiry[y].inv),color:COLORS[3],stack:'e'}],st);
@@ -1388,7 +1421,7 @@ function wiAdvice(D,S){ const {v,R,best,closePick}=D, b=R[best], sb='team', s=R.
 M.whatif={key:'whatif',label:'دراسة وتحليل الفرصة',icon:'🔍',group:'الرئيسية',render(v){
   const st=WIView, {S,v:val,sv}=wiVals(), D=wiDecide(val), A=wiAdvice(D,S), R=D.R;
   const Q=WI_FD.filter(f=>f.g==='q'); if(st.step===undefined) st.step=sv.done?null:0;
-  const toolbar=`<div class="toolbar"><span class="wlead">حلّل أي مشروع جديد: أجب عن الأسئلة، ويقترح لك طريقة التشغيل الأنسب وأرقامها.</span><span class="sp"></span><button class="btn sm" id="wiReset">↺ دراسة مشروع جديد</button></div>`;
+  const toolbar=`<div class="toolbar wctr"><span class="wlead">حلّل أي مشروع جديد: أجب عن الأسئلة، ويقترح لك طريقة التشغيل الأنسب وأرقامها.</span><span class="sp"></span><button class="btn sm" id="wiReset">↺ دراسة مشروع جديد</button></div>`;
   const bindTop=()=>{ $('#wiReset',v).onclick=()=>ask('ستُمسح إجابات الدراسة الحالية وتبدأ الأسئلة من جديد لمشروع آخر.',()=>{ delete Store.data.wiStudies[WI_KEY]; Store.save(); st.opt=''; st.step=0; M.whatif.render(v); },'دراسة جديدة'); };
   const disp=f=>{ const x=val[f.id]; if(f.opts) return f.opts[x]?.l||'—'; if(!x&&['qOffer','qCash'].includes(f.id)) return f.id==='qCash'?'غير محددة':'لا يوجد'; if(f.id==='qH') return wiYrs(x); if(f.id==='qRamp') return x?`${x} شهر`:'فوري'; return `${Math.round(Number(x)/(f.per||1)).toLocaleString('en-US')} ${f.u||''}`; };
   if(st.step!=null){ const i=Math.max(0,Math.min(Q.length-1,st.step)), f=Q[i], cur=val[f.id], sug=f.def(val,S), from=f.src&&f.src(S);

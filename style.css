@@ -519,3 +519,21 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .cst{font-size:12.5px;font-weight:700;color:var(--muted);white-space:nowrap;padding:5px 10px;border-radius:999px;background:var(--sand-2)}
 .cst.ok{color:var(--ok);background:var(--ok-bg)} .cst.warn{color:var(--amber);background:var(--amber-bg)} .cst.bad{color:var(--red);background:var(--red-bg)}
 @media(max-width:700px){.cst{display:none}}
+
+/* التحليل المالي في لوحة التحكم */
+.dah{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px} .dah h3{margin:0}
+.dfin{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.dfc{border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0} .dfc.wide{grid-column:1/-1}
+.dft{font-size:15px;font-weight:800} .dft span{font-size:12.5px;font-weight:500;color:var(--muted);margin-inline-start:6px}
+.dfn{font-size:13.5px;line-height:1.7;background:var(--sand);border-radius:10px;padding:8px 12px;border-inline-start:3px solid var(--gold)}
+@media(max-width:900px){.dfin{grid-template-columns:1fr}}
+/* بطاقة السؤال في المنتصف، والشرح تحتها أفقياً */
+.wizw{grid-template-columns:minmax(0,1fr)!important;max-width:880px!important}
+.wzside{display:grid!important;grid-template-rows:auto auto;grid-auto-flow:column;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 22px;border-inline-start:0!important;border-top:4px solid var(--gold)}
+.wzside h4{margin:0!important;grid-row:1} .wzside p{align-self:start;grid-row:2}
+.wzside .wzlive{grid-row:3;grid-column:1/-1;flex-direction:row!important;flex-wrap:wrap;gap:10px!important;margin-top:10px}
+.wzlive>.small,.wzlive>.sub{flex-basis:100%}
+.wzlive>div:not(.small):not(.sub){flex:1 1 140px;flex-direction:column!important;justify-content:flex-start!important;gap:2px!important;background:var(--sand);border-radius:10px;padding:8px 10px;border:0!important}
+.wzlive>div:not(.small):not(.sub) b{font-size:16px} .wzlive .tot{background:var(--sand-2)!important}
+@media(max-width:760px){.wzside{display:flex!important;flex-direction:column}}
+.toolbar.wctr{justify-content:center;text-align:center} .toolbar.wctr .sp{display:none}
