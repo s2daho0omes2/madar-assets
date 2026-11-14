@@ -236,12 +236,13 @@ const Charts={ list:[], destroy(){ this.list.forEach(c=>c.destroy()); this.list=
 /* ───────────────────────── الحفظ السحابي ─────────────────────────
    قاعدة Firebase عبر REST. المفتاح الخاص يأتي من رابط الدخول (#k=...) ويُحفظ في هذا المتصفح فقط، وغير موجود في كود الموقع.
    بدون مفتاح يعمل النظام محلياً كما كان. */
-const Cloud={ base:'https://madar-assets-default-rtdb.europe-west1.firebasedatabase.app/madar/', key:null, timer:null, dirty:false, state:'local',
+const Cloud={ url:'https://madar-assets-default-rtdb.europe-west1.firebasedatabase.app/madar/', key:null, timer:null, dirty:false, state:'local',
   init(){ const m=(location.hash+location.search).match(/k=([a-f0-9]{24,})/); if(m){ ls.set('am_cloud_key',m[1]); try{ history.replaceState(null,'',location.pathname+'#dashboard'); }catch(e){} } this.key=ls.get('am_cloud_key')||null; return !!this.key; },
-  ep(p){ return this.base+this.key+(p||'')+'.json'; },
+  ep(p){ return this.url+this.key+(p||'')+'.json'; },
   link(){ return this.key?location.origin+location.pathname+'#k='+this.key:''; },
   async pull(){ const c=new AbortController(), t=setTimeout(()=>c.abort(),9000); try{ const r=await fetch(this.ep(),{cache:'no-store',signal:c.signal}); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); } finally{ clearTimeout(t); } },
-  push(){ if(!this.key) return; this.dirty=true; this.set('saving'); clearTimeout(this.timer); this.timer=setTimeout(()=>this.flush(),700); },
+  ready:false,
+  push(){ if(!this.key) return; this.dirty=true; if(!this.ready){ this.set('error'); return; } this.set('saving'); clearTimeout(this.timer); this.timer=setTimeout(()=>this.flush(),700); },
   /* آخر نسخة متزامنة مع السيرفر: أساس الدمج الثلاثي (ما غيّرته أنت مقابل ما تغيّر على السيرفر) */
   base:null, baseTs:0,
   setBase(json,ts){ this.baseTs=ts||0; try{ this.base=JSON.parse(json); localStorage.setItem('am_db_base',json); }catch(e){ this.base=null; } },
@@ -256,7 +257,7 @@ const Cloud={ base:'https://madar-assets-default-rtdb.europe-west1.firebasedatab
         const ord=[]; (r||[]).forEach(x=>{ if(x&&res.has(x.id)){ ord.push(res.get(x.id)); res.delete(x.id); } }); added.forEach(x=>{ if(res.has(x.id)){ ord.unshift(x); res.delete(x.id); } }); res.forEach(x=>ord.push(x)); out[k]=ord; }
       else if(J(l)!==J(b)) out[k]=l; });
     return out; },
-  async flush(keep){ if(!this.key||!this.dirty) return; this.dirty=false;
+  async flush(keep){ if(!this.key||!this.dirty||!this.ready) return; this.dirty=false;
     try{
       if(!keep){ const rr=await fetch(this.ep('/_ts'),{cache:'no-store'}); const rt=rr.ok?await rr.json():null;
         if(rt&&this.baseTs&&rt!==this.baseTs){ const remote=Store.fix(await this.pull()); if(remote&&remote.settings){ Store.data=this.merge(this.base,Store.data,remote); Store.data._ts=Date.now(); Store.saveLocal(); if(!document.querySelector('.modal')) App.render(); toast('دُمجت تعديلاتك مع تحديثات من جهاز آخر'); } } }
@@ -264,7 +265,11 @@ const Cloud={ base:'https://madar-assets-default-rtdb.europe-west1.firebasedatab
       this.setBase(body,Store.data._ts); if(!this.dirty) this.set('saved');
     }catch(e){ this.dirty=true; this.set('error'); } },
   /* تحديث من جهاز آخر: يُفحص عند العودة للنافذة وكل 20 ثانية. إن كان عندك تعديل لم يُرفع فالدمج يتم عند الحفظ */
-  async check(){ if(!this.key||this.dirty) return; try{ const r=await fetch(this.ep('/_ts'),{cache:'no-store'}); if(!r.ok) return; const t=await r.json(); if(this.state==='error') this.set('saved');
+  /* لم تُقرأ السحابة عند الفتح (انقطاع): لا رفع قبل قراءة ناجحة، ثم دمج ما عُدّل محلياً */
+  async reconnect(){ try{ const d=await this.pull(); if(!d||!d.settings) return; this.loadBase(); const changed=this.base&&JSON.stringify(Object.assign({},Store.data,{_ts:0}))!==JSON.stringify(Object.assign({},this.base,{_ts:0}));
+      if(this.dirty&&this.base){ Store.data=this.merge(this.base,Store.data,Store.fix(d)); Store.data._ts=Date.now(); this.baseTs=d._ts; } else { Store.data=Store.fix(d); this.dirty=false; }
+      Store.saveLocal(); this.ready=true; if(this.dirty) await this.flush(); else { this.setBase(JSON.stringify(Store.data),Store.data._ts); this.set('saved'); } if(!document.querySelector('.modal')){ App.render(); App.refreshBadges(); } }catch(e){} },
+  async check(){ if(!this.key) return; if(!this.ready) return this.reconnect(); if(this.dirty) return; try{ const r=await fetch(this.ep('/_ts'),{cache:'no-store'}); if(!r.ok) return; const t=await r.json(); if(this.state==='error') this.set('saved');
       if(t&&t!==this.baseTs&&t>(Store.data._ts||0)){ const d=await this.pull(); if(d&&d.settings&&!this.dirty){ Store.data=Store.fix(d); Store.saveLocal(); this.setBase(JSON.stringify(Store.data),Store.data._ts); if(!document.querySelector('.modal')){ App.render(); App.refreshBadges(); } toast('حُمّل آخر تحديث من جهاز آخر'); } } }catch(e){} },
   set(st){ this.state=st; const el=document.getElementById('cloudSt'); if(!el) return; const T={saved:['☁ محفوظ سحابياً','ok'],saving:['⟳ جارٍ الحفظ…','warn'],error:['⚠ غير متصل · محفوظ على الجهاز','bad'],local:['محفوظ على هذا الجهاز فقط','']}[st]; el.textContent=T[0]; el.className='cst '+T[1]; el.title=st==='local'?'افتح رابط النظام الخاص لتفعيل الحفظ السحابي':''; }
 };
@@ -1669,10 +1674,10 @@ const App={
     if(Cloud.init()){ Cloud.set('saving');
       try{ const force=ls.get('am_push_next')==='1'; const d=force?null:await Cloud.pull();
         Cloud.loadBase();
-        if(d&&d.settings&&(d._ts||0)>=(Store.data._ts||0)){ Store.data=Store.fix(d); Store.saveLocal(); Cloud.setBase(JSON.stringify(Store.data),Store.data._ts); Cloud.set('saved'); }
-        else if(d&&d.settings&&Cloud.base&&!force){ Store.data=Cloud.merge(Cloud.base,Store.data,Store.fix(d)); Store.data._ts=Date.now(); Store.saveLocal(); Cloud.baseTs=d._ts; Cloud.dirty=true; await Cloud.flush(); } // تعديلات محلية لم تُرفع: تُدمج
-        else { try{ localStorage.removeItem('am_push_next'); }catch(e){} Store.data._ts=Store.data._ts||Date.now(); Cloud.baseTs=0; Cloud.dirty=true; await Cloud.flush(); } // أول جهاز، أو استرجاع نسخة: يرفع بياناته
-      }catch(e){ Cloud.set('error'); }
+        if(d&&d.settings&&(d._ts||0)>=(Store.data._ts||0)){ Store.data=Store.fix(d); Store.saveLocal(); Cloud.setBase(JSON.stringify(Store.data),Store.data._ts); Cloud.ready=true; Cloud.set('saved'); }
+        else if(d&&d.settings&&Cloud.base&&!force){ Store.data=Cloud.merge(Cloud.base,Store.data,Store.fix(d)); Store.data._ts=Date.now(); Store.saveLocal(); Cloud.baseTs=d._ts; Cloud.ready=true; Cloud.dirty=true; await Cloud.flush(); } // تعديلات محلية لم تُرفع: تُدمج
+        else { try{ localStorage.removeItem('am_push_next'); }catch(e){} Store.data._ts=Store.data._ts||Date.now(); Cloud.baseTs=0; Cloud.ready=true; Cloud.dirty=true; await Cloud.flush(); } // أول جهاز، أو استرجاع نسخة: يرفع بياناته
+      }catch(e){ Cloud.ready=false; Cloud.set('error'); setTimeout(()=>Cloud.reconnect(),3000); }
       addEventListener('focus',()=>Cloud.check()); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) Cloud.check(); else Cloud.flush(true); });
       setInterval(()=>Cloud.check(),20000); addEventListener('pagehide',()=>Cloud.flush(true));
     } else Cloud.set('local');
