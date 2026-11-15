@@ -503,7 +503,7 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .gmap:has(img.sat)::after{display:none}
 .gmap::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:1;background:radial-gradient(ellipse at 50% 50%,rgba(8,12,16,0) 35%,rgba(8,12,16,.55) 100%)} .gx.edit .gmap{cursor:crosshair}
 .gx{position:relative;border-radius:18px;overflow:hidden;background:#141b22;color:#eef2f5;box-shadow:0 10px 30px rgba(0,0,0,.25)}
-.gxv{overflow:auto;aspect-ratio:3200/1745;max-height:78vh;width:100%;scrollbar-width:thin}
+.gxv{overflow:auto;aspect-ratio:3090/2036;max-height:78vh;width:100%;scrollbar-width:thin}
 .gx.mini .gxv{max-height:none;overflow:hidden} .gx.mini .gxh h2{font-size:20px} .gxtabs a{padding:7px 16px;border-radius:9px;font-weight:700;font-size:14px;color:#e6edf2;text-decoration:none} .gxtabs a.on{background:#fff;color:#16242f}
 .gx.mini .gxleg{flex-direction:row;gap:14px}
 .gxh{position:relative;z-index:6;display:flex;align-items:center;gap:14px;padding:14px 20px;background:#141b22;border-bottom:1px solid rgba(255,255,255,.08)}
