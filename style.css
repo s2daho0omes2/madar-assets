@@ -494,7 +494,7 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 /* الخريطة التفاعلية: لوحة داكنة فوق صورة الأقمار الصناعية، وبطاقات مؤشرات فوق كل موقع */
 .gmap{position:relative;line-height:0;user-select:none;background:#1b232b}
 .gmap img{width:100%;height:auto;display:block;filter:grayscale(.75) brightness(.5) contrast(1.2)}
-.gmap img.dk{filter:none} .gmap img.sat{filter:brightness(.88) saturate(.95)}
+.gmap img.dk{filter:none} .gmap img.sat{filter:brightness(.94)}
 .gxlay{all:unset;box-sizing:border-box;position:absolute;bottom:16px;right:64px;z-index:6;width:78px;height:78px;border-radius:12px;border:3px solid #fff;background-size:cover;background-position:55% 50%;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.45);overflow:hidden;transition:transform .15s}
 .gxlay:hover{transform:scale(1.05)} .gxlay:focus-visible{outline:3px solid #d4ad74;outline-offset:2px}
 .gxlay span{position:absolute;inset:auto 0 0 0;background:linear-gradient(0deg,rgba(0,0,0,.8),rgba(0,0,0,0));color:#fff;font-size:11.5px;font-weight:800;text-align:center;padding:12px 2px 4px;line-height:1.2}
@@ -502,8 +502,8 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .gxattr{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);z-index:6;font-size:10.5px;color:rgba(230,237,242,.55);pointer-events:none}
 .gmap::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:1;background:radial-gradient(ellipse at 50% 50%,rgba(8,12,16,0) 35%,rgba(8,12,16,.55) 100%)} .gx.edit .gmap{cursor:crosshair}
 .gx{position:relative;border-radius:18px;overflow:hidden;background:#141b22;color:#eef2f5;box-shadow:0 10px 30px rgba(0,0,0,.25)}
-.gxv{overflow:auto;height:min(78vh,760px);scrollbar-width:thin}
-.gx.mini .gxv{height:440px;overflow:hidden} .gx.mini .gxh h2{font-size:20px} .gxtabs a{padding:7px 16px;border-radius:9px;font-weight:700;font-size:14px;color:#e6edf2;text-decoration:none} .gxtabs a.on{background:#fff;color:#16242f}
+.gxv{overflow:auto;aspect-ratio:3200/1745;max-height:78vh;width:100%;scrollbar-width:thin}
+.gx.mini .gxv{max-height:440px;overflow:hidden} .gx.mini .gxh h2{font-size:20px} .gxtabs a{padding:7px 16px;border-radius:9px;font-weight:700;font-size:14px;color:#e6edf2;text-decoration:none} .gxtabs a.on{background:#fff;color:#16242f}
 .gx.mini .gxleg{flex-direction:row;gap:14px}
 .gxh{position:relative;z-index:6;display:flex;align-items:center;gap:14px;padding:14px 20px;background:#141b22;border-bottom:1px solid rgba(255,255,255,.08)}
 .gxh>*{pointer-events:auto} .gxh h2{margin:0;font-size:24px;font-weight:800;color:#fff;letter-spacing:-.2px} .gxh h2 span{font-weight:500;font-size:16px;color:#cfd8df;margin-inline-start:6px} .gxh .small{color:#b9c4cc;margin-top:2px}
@@ -526,8 +526,8 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .gpin em{position:absolute;left:-21px;top:-10px;width:42px;height:20px;border-radius:50%;border:2px solid var(--pc);background:color-mix(in srgb,var(--pc) 22%,transparent);box-shadow:0 0 16px var(--pc)}
 .gpin i{position:absolute;left:-17px;top:-38px;width:34px;height:38px;transition:transform .15s;transform-origin:50% 100%} .gpin i svg{display:block;width:100%;height:100%;filter:drop-shadow(0 5px 6px rgba(0,0,0,.65))}
 .gpin i b{font-size:26px;font-weight:400;filter:drop-shadow(0 3px 4px rgba(0,0,0,.6))}
-.gpin span{position:absolute;left:50%;bottom:52px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:flex-end;white-space:nowrap;background:rgba(14,20,26,.94);color:#fff;padding:9px 13px 8px;border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.14);pointer-events:none;direction:rtl;min-width:130px}
-.gpin span::after{content:"";position:absolute;left:50%;top:100%;width:2px;height:14px;background:rgba(255,255,255,.6);transform:translateX(-50%)}
+.gpin span{position:absolute;left:50%;bottom:52px;transform:translate(-50%,calc(-1 * var(--dy,0px)));display:flex;flex-direction:column;align-items:flex-end;white-space:nowrap;background:rgba(14,20,26,.94);color:#fff;padding:9px 13px 8px;border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.14);pointer-events:none;direction:rtl;min-width:130px}
+.gpin span::after{content:"";position:absolute;left:50%;top:100%;width:2px;height:calc(14px + var(--dy,0px));background:rgba(255,255,255,.6);transform:translateX(-50%)}
 .gpin span strong{font-size:14px;font-weight:800;padding-inline-end:10px;border-inline-end:3px solid var(--pc)} .gpin span big{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.15} .gpin span big small{font-size:12px;font-weight:600;color:#c8d1d8}
 .gpin span .gs{font-size:11.5px;color:#d7dee4;display:inline-flex;align-items:center;gap:6px;border-top:1px solid rgba(255,255,255,.15);padding-top:4px;margin-top:3px;width:100%} .gpin span .gs u{width:8px;height:8px;border-radius:50%;background:var(--pc);text-decoration:none}
 .gpin:hover,.gpin:focus-visible,.gpin.sel{z-index:5} .gpin:hover i,.gpin:focus-visible i,.gpin.sel i{transform:scale(1.2)} .gpin.sel span{outline:2px solid var(--pc)}
@@ -537,7 +537,7 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .gtmp{position:absolute;width:18px;height:18px;border-radius:50%;border:3px dashed #fff;background:rgba(212,173,116,.8);transform:translate(-50%,-50%);z-index:3;pointer-events:none;box-shadow:0 0 0 4px rgba(0,0,0,.25)}
 .gleg{display:flex;align-items:center;gap:8px 18px;flex-wrap:wrap;padding:10px 6px 2px;font-size:13.5px;line-height:1.4}
 .gleg span{display:inline-flex;align-items:center;gap:7px} .gleg i{width:11px;height:11px;border-radius:50%;background:var(--pc)} .gleg i.ok{--pc:#3fbf6f} .gleg i.warn{--pc:#f0a63a} .gleg i.bad{--pc:#e4574a}
-@media (max-width:760px){.gx.mini .gxv{height:340px}.gxh{flex-wrap:wrap}.gxh h2{font-size:18px}.gxk{top:auto;bottom:16px;left:12px;right:12px;min-width:0;padding:10px 12px}.gxk .v{font-size:30px}.gxleg{display:none}.gpin span big{font-size:17px}.gpin span{min-width:0;padding:6px 9px}.gxbs div{padding:0 10px}.gxbs b{font-size:18px}}
+@media (max-width:760px){.gxh{flex-wrap:wrap}.gxh h2{font-size:18px}.gxk{top:auto;bottom:16px;left:12px;right:12px;min-width:0;padding:10px 12px}.gxk .v{font-size:30px}.gxleg{display:none}.gpin span big{font-size:17px}.gpin span{min-width:0;padding:6px 9px}.gxbs div{padding:0 10px}.gxbs b{font-size:18px}}
 @media (prefers-reduced-motion:reduce){.gpin.mv i{animation:none}}
 
 .dmaph{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 8px 10px} .dmaph h3{margin:0}
