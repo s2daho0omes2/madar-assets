@@ -503,7 +503,7 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .gmap:has(img.sat)::after{display:none}
 .gmap::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:1;background:radial-gradient(ellipse at 50% 50%,rgba(8,12,16,0) 35%,rgba(8,12,16,.55) 100%)} .gx.edit .gmap{cursor:crosshair}
 .gx{position:relative;border-radius:18px;overflow:hidden;background:#141b22;color:#eef2f5;box-shadow:0 10px 30px rgba(0,0,0,.25)}
-.gxv{overflow:auto;aspect-ratio:4096/2710;max-height:78vh;width:100%;scrollbar-width:thin}
+.gxv{direction:ltr;overflow:auto;aspect-ratio:4096/2710;max-height:78vh;width:100%;scrollbar-width:thin}
 .gx.mini .gxv{max-height:none;overflow:hidden} .gx.mini .gxh h2{font-size:20px} .gxtabs a{padding:7px 16px;border-radius:9px;font-weight:700;font-size:14px;color:#e6edf2;text-decoration:none} .gxtabs a.on{background:#fff;color:#16242f}
 .gx.mini .gxleg{flex-direction:row;gap:14px}
 .gxh{position:relative;z-index:6;display:flex;align-items:center;gap:14px;padding:14px 20px;background:#141b22;border-bottom:1px solid rgba(255,255,255,.08)}
@@ -604,3 +604,49 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
 .agbe{display:flex;flex-direction:column;gap:2px;padding:9px 12px;border-radius:10px;font-size:13.5px;line-height:1.6;background:var(--amber-bg);color:var(--amber)}
 .agbe b{font-size:15px} .agbe small{display:block;font-size:12px;opacity:.85}
 .agbe.ok{background:var(--ok-bg);color:var(--ok)} .agbe.bad{background:var(--red-bg);color:var(--red)}
+
+/* ───── الجوال: ترتيب عام ───── */
+@media (max-width:700px){
+  .topbar{gap:6px;padding:8px 10px}
+  .topbar h2{font-size:16px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topbar .user .small{display:none}
+  .topbar .user select{max-width:118px;font-size:12px;padding:5px 6px}
+  .topbar .btn.ic{padding:5px 7px}
+}
+@media (max-width:480px){ .topbar .user{display:none} .topbar h2{font-size:17px} }
+@media (max-width:700px){
+  .content{padding:10px 10px 60px}
+  .card{padding:14px}
+  html,body{overflow-x:hidden}
+  .split>*{min-width:0} .chain .st{min-width:0;flex-basis:100%} .chain .arrow{display:none}
+  .g2,.g3{grid-template-columns:minmax(0,1fr)} .g4{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+/* الخريطة على الجوال: أكبر وقابلة للسحب، وبطاقات مختصرة */
+@media (max-width:700px){
+  .gxv,.gx.mini .gxv{aspect-ratio:auto;height:360px;max-height:none;overflow:auto;-webkit-overflow-scrolling:touch}
+  .gx .gmap{min-width:240%}
+  .gxh{padding:12px 14px} .gxh h2{font-size:17px} .gxh .small{font-size:11.5px}
+  .gxtabs button,.gxtabs a{padding:6px 10px;font-size:12.5px}
+  .gpin span{min-width:0;padding:5px 8px 4px;border-radius:9px;bottom:44px}
+  .gpin span strong{font-size:12px;padding-inline-end:6px} .gpin span big{font-size:15px} .gpin span big small{font-size:10px} .gpin span .gs{display:none}
+  .gpin i{left:-13px;top:-30px;width:26px;height:30px} .gpin em{left:-16px;top:-8px;width:32px;height:16px}
+  .gxk{position:static;margin:10px;min-width:0} .gxk .v{font-size:28px}
+  .gxz{bottom:12px;right:12px}
+  .gxb{position:static;margin:10px;flex-direction:column;align-items:stretch;gap:10px} .gxbs{flex-wrap:wrap;justify-content:space-between} .gxbs div{padding:4px 6px;flex:1 1 45%;border:0} .gxba{flex-wrap:wrap}
+  .gx.hasbar .gxleg,.gx.hasbar .gxz{bottom:12px}
+}
+/* الجداول على الجوال: سطر واحد لكل خلية مع سحب أفقي، والعمود الأول ثابت */
+@media (max-width:700px){
+  .tbl{font-size:12.5px}
+  .tbl td{white-space:nowrap;padding:8px 9px}
+  .tbl td .small,.tbl td .muted{white-space:nowrap}
+  .tbl th:first-child,.tbl td:first-child{position:sticky;inset-inline-start:0;background:var(--card);z-index:1;box-shadow:-6px 0 8px -6px rgba(0,0,0,.18)}
+  .tbl th:first-child{z-index:2}
+  .twrap{max-height:none;-webkit-overflow-scrolling:touch}
+  .pagehead{padding:12px 14px} .pagehead h3{font-size:17px}
+  .sumline>div{flex:1 1 45%}
+  .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none} .tabs button{white-space:nowrap;flex:0 0 auto}
+  .modal{max-height:96vh;border-radius:14px} .modal .form{grid-template-columns:1fr}
+  .toolbar{gap:8px}
+}

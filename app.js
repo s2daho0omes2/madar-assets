@@ -1407,6 +1407,8 @@ const gisDeclutter=root=>{ if(!root) return; const P=[...root.querySelectorAll('
       p.style.setProperty('--dy','0px'); r=sp.getBoundingClientRect(); const hit=hitOf(r);
       if(hit){ const left=hit.left-r.right-12, right=hit.right-r.left+12, dx=(r.left+left>box.left+6)?left:right; p.style.setProperty('--dx',dx+'px'); }
       r=sp.getBoundingClientRect(); if(r.top<box.top+6) p.style.setProperty('--dy',(r.top-box.top-6)+'px'); }
+    r=sp.getBoundingClientRect(); const dx0=parseFloat(p.style.getPropertyValue('--dx'))||0, vw=root.closest('.gxv'), L=vw?Math.max(box.left,0):box.left, R=vw?Math.min(box.right,innerWidth):box.right; // البطاقة تبقى داخل حدود العرض
+    if(r.right>R-4) p.style.setProperty('--dx',(dx0-(r.right-R+4))+'px'); else if(r.left<L+4) p.style.setProperty('--dx',(dx0+(L+4-r.left))+'px');
     placed.push(sp.getBoundingClientRect()); }); };
 const gisFit=el=>{ if(!el) return; const go=()=>{ const m=el.querySelector('.gmap'), P=[...m.querySelectorAll('.gpin')]; if(!m.offsetHeight) return; let cx=.5, cy=.5; if(P.length){ cx=P.reduce((t,p)=>t+parseFloat(p.style.left),0)/P.length/100; cy=P.reduce((t,p)=>t+parseFloat(p.style.top),0)/P.length/100; } el.scrollLeft=Math.max(0,cx*m.offsetWidth-el.clientWidth/2); el.scrollTop=Math.max(0,cy*m.offsetHeight-el.clientHeight/2-50); gisDeclutter(m); }; const img=el.querySelector('img'); if(img&&!img.complete) img.addEventListener('load',go,{once:true}); go(); };
 M.gis={key:'gis',label:'الخريطة',icon:'🗺️',group:'متقدم',render(v){
