@@ -1398,8 +1398,16 @@ const GisView={metric:'rev',sel:null,zoom:1};
 const GIS_BLD='<svg viewBox="0 0 40 44" aria-hidden="true"><path d="M20 4 36 12v20L20 40 4 32V12z" fill="#1c2630"/><path d="M4 12l16 8v20L4 32z" fill="#e6dfd0"/><path d="M36 12 20 20v20l16-8z" fill="#c4b89f"/><path d="M20 4 36 12 20 20 4 12z" fill="#f6f2ea"/><path d="M6.5 17.8l2.6 1.3v3.2l-2.6-1.3zM22.5 18.2l2.6-1.3v3.2l-2.6 1.3zM11.1 20.1l2.6 1.3v3.2l-2.6-1.3zM27.1 15.9l2.6-1.3v3.2l-2.6 1.3zM15.7 22.4l2.6 1.3v3.2l-2.6-1.3zM31.7 13.7l2.6-1.3v3.2l-2.6 1.3zM6.5 23.9l2.6 1.3v3.2l-2.6-1.3zM22.5 24.4l2.6-1.3v3.2l-2.6 1.3zM11.1 26.2l2.6 1.3v3.2l-2.6-1.3zM27.1 22.1l2.6-1.3v3.2l-2.6 1.3zM15.7 28.6l2.6 1.3v3.2l-2.6-1.3zM31.7 19.9l2.6-1.3v3.2l-2.6 1.3zM6.5 30.1l2.6 1.3v3.2l-2.6-1.3zM22.5 30.6l2.6-1.3v3.2l-2.6 1.3zM11.1 32.5l2.6 1.3v3.2l-2.6-1.3zM27.1 28.4l2.6-1.3v3.2l-2.6 1.3zM15.7 34.8l2.6 1.3v3.2l-2.6-1.3zM31.7 26.1l2.6-1.3v3.2l-2.6 1.3z" fill="#3b4a57" opacity=".75"/></svg>';
 /* يوسّط عرض الخريطة على المواقع المربوطة (البطاقات فوق الدبابيس، فيُزاح قليلاً للأعلى) */
 /* يمنع تراكب بطاقات الدبابيس: البطاقة المتداخلة تُرفع للأعلى ويطول خطها */
-const gisDeclutter=root=>{ if(!root) return; const P=[...root.querySelectorAll('.gpin')]; P.forEach(p=>p.style.setProperty('--dy','0px')); const placed=[];
-  P.sort((a,b)=>parseFloat(b.style.top)-parseFloat(a.style.top)).forEach(p=>{ const sp=p.querySelector('span'); let dy=0; for(let i=0;i<12;i++){ const r=sp.getBoundingClientRect(), hit=placed.find(q=>r.left<q.right+6&&r.right>q.left-6&&r.top<q.bottom+6&&r.bottom>q.top-6); if(!hit) break; dy+=r.bottom-hit.top+10; p.style.setProperty('--dy',dy+'px'); } placed.push(sp.getBoundingClientRect()); }); };
+const gisDeclutter=root=>{ if(!root) return; const P=[...root.querySelectorAll('.gpin')], box=(root.closest('.gxv')||root).getBoundingClientRect(); P.forEach(p=>{ p.style.setProperty('--dy','0px'); p.style.setProperty('--dx','0px'); }); const placed=[];
+  const hitOf=r=>placed.find(q=>r.left<q.right+6&&r.right>q.left-6&&r.top<q.bottom+6&&r.bottom>q.top-6);
+  P.sort((a,b)=>parseFloat(b.style.top)-parseFloat(a.style.top)).forEach(p=>{ const sp=p.querySelector('span'); let dy=0;
+    for(let i=0;i<12;i++){ const r=sp.getBoundingClientRect(), hit=hitOf(r); if(!hit) break; dy+=r.bottom-hit.top+10; p.style.setProperty('--dy',dy+'px'); }
+    let r=sp.getBoundingClientRect();
+    if(r.top<box.top+6){ // لا مكان فوق: تُزاح البطاقة جانباً بدل رفعها خارج الخريطة
+      p.style.setProperty('--dy','0px'); r=sp.getBoundingClientRect(); const hit=hitOf(r);
+      if(hit){ const left=hit.left-r.right-12, right=hit.right-r.left+12, dx=(r.left+left>box.left+6)?left:right; p.style.setProperty('--dx',dx+'px'); }
+      r=sp.getBoundingClientRect(); if(r.top<box.top+6) p.style.setProperty('--dy',(r.top-box.top-6)+'px'); }
+    placed.push(sp.getBoundingClientRect()); }); };
 const gisFit=el=>{ if(!el) return; const go=()=>{ const m=el.querySelector('.gmap'), P=[...m.querySelectorAll('.gpin')]; if(!m.offsetHeight) return; let cx=.5, cy=.5; if(P.length){ cx=P.reduce((t,p)=>t+parseFloat(p.style.left),0)/P.length/100; cy=P.reduce((t,p)=>t+parseFloat(p.style.top),0)/P.length/100; } el.scrollLeft=Math.max(0,cx*m.offsetWidth-el.clientWidth/2); el.scrollTop=Math.max(0,cy*m.offsetHeight-el.clientHeight/2-50); gisDeclutter(m); }; const img=el.querySelector('img'); if(img&&!img.complete) img.addEventListener('load',go,{once:true}); go(); };
 M.gis={key:'gis',label:'الخريطة',icon:'🗺️',group:'متقدم',render(v){
   let curMap=GIS_BASE.id, moving=null; const gv=GisView;
