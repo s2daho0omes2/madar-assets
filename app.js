@@ -1367,11 +1367,11 @@ M.reports={key:'reports',label:'التقارير والتحليلات',icon:'�
 
 /* 11. الخرائط GIS */
 /* الخريطة: خريطة ينبع الصناعية مدمجة. انقر أي نقطة لربطها بمشروع موجود، وانقر الدبوس لعرض المشروع أو نقله */
-const GIS_BASE={id:'MAP-YANBU',name:'ينبع الصناعية',src:'assets/yanbu-sat.webp',builtin:true};
+const GIS_BASE={id:'MAP-YANBU',name:'ينبع الصناعية',src:'assets/yanbu-sat.webp?v=2',builtin:true};
 /* الخريطة تعرض المشاريع فقط (أصل الاتفاقية)، لا العمارات ولا الوحدات */
 const gisIsProject=a=>{ const k=agreementFor(a.id); return !!k&&k.assetId===a.id; };
 /* طبقات الخريطة الأساسية مثل قوقل ماب: خريطة داكنة (من OpenStreetMap) أو صورة قمر صناعي واقعية. الاختيار يُحفظ في هذا المتصفح */
-const GIS_LAYERS={sat:{l:'قمر صناعي',src:'assets/yanbu-sat.webp',cls:'sat',attr:'صورة قمر صناعي'}};
+const GIS_LAYERS={sat:{l:'قمر صناعي',src:'assets/yanbu-sat.webp?v=2',cls:'sat',attr:'صورة قمر صناعي'}};
 const gisLayer=()=>'sat';
 const gisImg=(mp,id='')=>{ const L=mp.builtin?GIS_LAYERS[gisLayer()]:null; return `<img ${id} data-base="${mp.builtin?1:''}" src="${L?L.src:mp.src}" class="${L?L.cls:''}" alt="خريطة ${esc(mp.name)}" draggable="false">`; };
 const gisLayerBtn=mp=>{ if(!mp.builtin||Object.keys(GIS_LAYERS).length<2) return ''; const o=gisLayer()==='dark'?'sat':'dark', L=GIS_LAYERS[o]; return `<button type="button" class="gxlay" data-lay="${o}" style="background-image:url('${L.src}')" aria-label="تغيير الطبقة إلى ${L.l}"><span>🗂 ${L.l}</span></button>`; };
