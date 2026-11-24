@@ -650,3 +650,46 @@ h4.wg{margin:18px 0 8px;font-size:14px;color:var(--gold)}
   .modal{max-height:96vh;border-radius:14px} .modal .form{grid-template-columns:1fr}
   .toolbar{gap:8px}
 }
+
+/* ───────── مدار مشروعات: الرئيسية والمدن والمدارات ───────── */
+.mhero{display:flex;align-items:center;gap:18px;margin:4px 0 22px}
+.mhero .mark{color:var(--green);flex:none}.mhero .mark svg{width:72px;height:66px}
+.mhero h1{margin:0;font-size:clamp(28px,4vw,40px);font-weight:800;line-height:1.1}
+.mhero p{margin:6px 0 0;color:var(--muted);font-size:14px}
+.mhero.city{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);border-inline-start:6px solid var(--cc)}
+.mhero.city>div:nth-child(2){flex:1;min-width:0}.cpinb{font-size:34px}
+.kpi .v small{font-size:13px;font-weight:600;color:var(--muted)}
+h3.sec{margin:8px 0 12px;font-size:18px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.cgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.ctile{display:flex;flex-direction:column;gap:14px;background:var(--card);border:1px solid var(--line);border-top:5px solid var(--cc);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);color:inherit;text-decoration:none;transition:transform .15s,box-shadow .15s}
+.ctile:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(22,36,47,.12)}
+.ct1{display:flex;align-items:center;gap:8px}.ct1 b{font-size:22px;flex:1}.cpin{font-size:20px}
+.ctn{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ctn div,.mtn div{display:flex;flex-direction:column}.ctn span,.mtn span{font-size:12px;color:var(--muted)}.ctn b,.mtn b{font-size:18px;font-weight:800}
+.ctp{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted)}
+.rqbar{display:block;height:6px;border-radius:6px;background:var(--line);overflow:hidden;min-width:60px}.rqbar i{display:block;height:100%;background:var(--ok);border-radius:6px}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}
+.mtile{display:flex;flex-direction:column;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);color:inherit;text-decoration:none;transition:transform .15s,border-color .15s}
+.mtile:hover{transform:translateY(-2px);border-color:var(--gold)}
+.mt1{display:flex;gap:12px;align-items:flex-start}.mic{font-size:26px;line-height:1}.mt1 b{display:block;font-size:17px}.mt1 span{font-size:12.5px;color:var(--muted)}
+.mtn{display:flex;gap:22px}
+.mtf{display:flex;align-items:center;gap:6px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:10px;margin-top:auto}.mtf .go{margin-inline-start:auto;color:var(--gold);font-weight:700;font-size:13px}
+.rq{padding:14px 16px}.rqh{display:flex;align-items:center;gap:10px;margin-bottom:8px}.rqh b{font-size:15px}.rqh .rqbar{flex:1;max-width:220px}
+.rql{list-style:none;margin:0;padding:0}.rql li{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.rql li>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.rqi{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:13px;background:var(--red-bg);color:var(--red)}
+.rql li.done .rqi{background:var(--ok-bg);color:var(--ok)}
+.cbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.card.live{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-inline-start:5px solid var(--ok)}.card.live>div{flex:1;min-width:220px;display:flex;flex-direction:column;gap:4px}
+.tbl tr.tot td{border-top:2px solid var(--line);background:var(--sand-2,transparent)}
+#citySel{max-width:130px}
+@media (max-width:900px){.cgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:700px){
+  .mhero{gap:12px;margin-bottom:16px}.mhero .mark svg{width:52px;height:48px}.mhero.city{flex-wrap:wrap}
+  .cgrid{grid-template-columns:minmax(0,1fr)}.ctile{padding:14px}.ctn{grid-template-columns:repeat(4,minmax(0,1fr))}.ctn b{font-size:15px}
+  .mgrid{grid-template-columns:minmax(0,1fr)}
+  .rql li{flex-wrap:wrap}.rql li .btn,.rql li .pill{margin-inline-start:36px}
+  #citySel{max-width:96px;font-size:13px}
+}
+@media (max-width:700px){.mhero~.grid .kpi .v,.mhero.city~.grid .kpi .v{font-size:22px}}
+.ct1{flex-wrap:wrap}.ct1 .pill{white-space:nowrap;font-size:11px}

@@ -125,7 +125,10 @@ const paysOfClient=id=>Store.coll('payments').filter(p=>p.clientId===id).sort((x
 const paysOfAsset=id=>Store.coll('payments').filter(p=>p.assetId===id).sort((x,y)=>(x.dueDate||'').localeCompare(y.dueDate||''));
 const clientFin=c=>finOf(paysOfClient(c.id));
 const finBar=f=>f.total?`<div class="bar" style="min-width:70px"><i style="width:${f.pct}%"></i></div><span class="small muted">${f.pct}%</span>`:'—';
-const opAgreements=()=>Store.coll('contracts').filter(k=>OP_TYPES.includes(k.type));
+const opAgreements=()=>Store.coll('contracts').filter(k=>OP_TYPES.includes(k.type)&&(!App.city||(k.city||'yanbu')===App.city));
+/* مدينة الأصل: من الاتفاقية التي يتبعها، وإلا من حقل المدينة في جذره. البيانات القديمة كلها في ينبع */
+const assetCity=a=>{ const k=agreementFor(a.id); if(k) return k.city||'yanbu'; let x=a; while(x&&x.parentId) x=Store.get('assets',x.parentId); return (x&&x.city)||'yanbu'; };
+const inCity=a=>!App.city||assetCity(a)===App.city;
 const contractName=id=>{ const k=Store.get('contracts',id); return k?`${k.title}`:'—'; };
 const ancestorsOf=id=>{ const out=[]; let a=Store.get('assets',id); while(a&&a.parentId){ a=Store.get('assets',a.parentId); if(a) out.unshift(a); } return out; };
 
@@ -259,7 +262,7 @@ const Charts={ list:[], destroy(){ this.list.forEach(c=>c.destroy()); this.list=
    قاعدة Firebase عبر REST. المفتاح الخاص يأتي من رابط الدخول (#k=...) ويُحفظ في هذا المتصفح فقط، وغير موجود في كود الموقع.
    بدون مفتاح يعمل النظام محلياً كما كان. */
 const Cloud={ url:'https://madar-assets-default-rtdb.europe-west1.firebasedatabase.app/madar/', key:null, timer:null, dirty:false, state:'local',
-  init(){ const m=(location.hash+location.search).match(/k=([a-f0-9]{24,})/); if(m){ ls.set('am_cloud_key',m[1]); try{ history.replaceState(null,'',location.pathname+'#dashboard'); }catch(e){} } this.key=ls.get('am_cloud_key')||null; return !!this.key; },
+  init(){ const m=(location.hash+location.search).match(/k=([a-f0-9]{24,})/); if(m){ ls.set('am_cloud_key',m[1]); try{ history.replaceState(null,'',location.pathname+'#home'); }catch(e){} } this.key=ls.get('am_cloud_key')||null; return !!this.key; },
   ep(p){ return this.url+this.key+(p||'')+'.json'; },
   link(){ return this.key?location.origin+location.pathname+'#k='+this.key:''; },
   async pull(){ const c=new AbortController(), t=setTimeout(()=>c.abort(),9000); try{ const r=await fetch(this.ep(),{cache:'no-store',signal:c.signal}); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); } finally{ clearTimeout(t); } },
@@ -305,9 +308,9 @@ function portfolioMetrics(all){
   const t=todayStr(), self=all.filter(x=>x.k.type==='تشغيل ذاتي'), inv=all.filter(x=>x.k.type==='مستثمر');
   const selfNoi=sum(self,'rev')-sum(self,'exp'), invNoi=sum(inv,'due'), noi=selfNoi+invNoi;
   const pay=sum(all,'pay'), profit=sum(all,'profit'), value=sum(all,'value');
-  const units=Store.coll('assets').filter(a=>a.level==='unit'&&agreementFor(a.id)?.type==='تشغيل ذاتي'), occ=units.filter(u=>u.occupancy==='مشغول');
+  const units=Store.coll('assets').filter(a=>a.level==='unit'&&agreementFor(a.id)?.type==='تشغيل ذاتي'&&inCity(a)), occ=units.filter(u=>u.occupancy==='مشغول');
   const pgi=sum(units,'rent'), occRent=sum(occ,'rent'), vacant=units.filter(u=>u.occupancy!=='مشغول'), unpriced=units.filter(u=>!Number(u.rent)).length;
-  const P=Store.coll('payments'), dueP=P.filter(p=>p.dueDate&&p.dueDate<=t);
+  const P=Store.coll('payments').filter(p=>{ const a=Store.get('assets',p.assetId); return !a||inCity(a); }), dueP=P.filter(p=>p.dueDate&&p.dueDate<=t);
   const dueAmt=sum(dueP,'amount'), duePaid=dueP.reduce((s,p)=>s+Math.min(Number(p.paid)||0,Number(p.amount)||0),0);
   const aging=[['حتى 30 يوم',0],['31 - 60 يوم',0],['61 - 90 يوم',0],['أكثر من 90 يوم',0]];
   P.forEach(p=>{ const rem=(Number(p.amount)||0)-(Number(p.paid)||0); if(rem<=0||!p.dueDate||p.dueDate>=t) return; const dd=-daysTo(p.dueDate); aging[dd<=30?0:dd<=60?1:dd<=90?2:3][1]+=rem; });
@@ -531,7 +534,7 @@ function renderUnitCond(c,refresh){ const st=AssetView, K=opAgreements();
   inp.onchange=()=>{ if(inp.files[0]&&target) urUpload(target,inp.files[0],()=>{ st.tab='cond'; refresh(); }); };
   c.querySelectorAll('[data-u]').forEach(r=>r.onclick=()=>assetDetail(Store.get('assets',r.dataset.u))); }
 M.assets={key:'assets',label:'سجل الأصول',icon:'🏗️',group:'الأساسي',render(v){
-  const A=Store.coll('assets'); const st=AssetView;
+  const A=Store.coll('assets').filter(inCity); const st=AssetView;
   const grp=t=>A.filter(x=>(agreementFor(x.id)?.type||'none')===t);
   const card=(t,label,icon,color)=>{ const L=grp(t), ks=t==='none'?[]:opAgreements().filter(k=>k.type===t); const units=L.filter(x=>x.level==='unit'), occ=units.filter(u=>u.occupancy==='مشغول').length; const val=ks.reduce((t,k)=>t+assetVal(k.assetId),0), nb=L.filter(x=>x.level==='building').length;
     return `<div class="card kpi agc ${st.ag===t?'sel':''}" data-ag="${t}" style="--kc:${color}"><div class="l">${icon} ${label}${t!=='none'?` · ${ks.length} اتفاقية`:''}</div><div class="v">${units.length} <span class="small muted">وحدة</span></div><div class="s">${nb} مبنى${units.length&&t==='تشغيل ذاتي'?` · إشغال ${pct(occ,units.length)}%`:''}${val?` · القيمة ${short(val)}`:''}</div></div>`; };
@@ -562,7 +565,7 @@ function assetFields(){ return [
   {k:'serial',label:'الرقم التسلسلي (معدات)'},{k:'warrantyEnd',label:'نهاية الضمان',type:'date'},{k:'lifeYears',label:'العمر الافتراضي (سنة)',type:'number'},{k:'acquiredOn',label:'تاريخ الاقتناء',type:'date'},
   {k:'notes',label:'ملاحظات',type:'textarea',full:true}]; }
 function renderTree(c){
-  const st=AssetView, all=Store.coll('assets'), ICON={project:'🏙️',district:'🏘️',building:'🏢',unit:'🏠',equipment:'⚙️'};
+  const st=AssetView, all=Store.coll('assets').filter(inCity), ICON={project:'🏙️',district:'🏘️',building:'🏢',unit:'🏠',equipment:'⚙️'};
   if(!st.open) st.open=new Set([...all.filter(a=>a.level==='project'||a.level==='district').map(a=>a.id),...opAgreements().map(k=>k.assetId)]);
   const open=st.open, rootOf=new Map(opAgreements().map(k=>[k.assetId,k]));
   const hasKids=id=>all.some(x=>x.parentId===id);
@@ -1693,7 +1696,7 @@ function wiAdvice(D,S){ const {v,R,best,closePick}=D, b=R[best], sb='team', s=R.
   else { plan.push(`جهّز فريق التأجير والتحصيل ${v.setupM?`خلال فترة التجهيز (${v.setupM} شهر)`:'قبل بدء التشغيل'}.`); plan.push(`اطرح عقد صيانة بسقف ${SAR(v.qUnits*v.maint)} سنوياً (${SAR(v.maint/12)} للوحدة شهرياً)، وقارن 3 عروض على الأقل.`); plan.push(`احجز سيولة تشغيلية ${short(-b.peak)} على الأقل لتغطية الفجوة حتى يستقر التحصيل.`); plan.push(`راقب الإشغال شهرياً: نزوله تحت ${Math.round(Math.min(100,occB))}% يعني مراجعة القرار.`); }
   const title=D.seek?'التوصية: لا تشغّله ذاتياً، واطلب عروض مستثمرين':`التوصية: ${WI_OPTS[best].l}`, action=D.seek?'التشغيل الذاتي خاسر بهذه الأرقام، فالأفضل البحث عن مستثمر.':best==='inv'?'اطرح المشروع لمستثمر بالشروط أدناه.':'شغّله تشغيلاً ذاتياً.';
   return {title,action,why,plan,tone:(best!=='inv'&&v.qCash>0&&need>v.qCash)||occB>100||allNeg?'warn':'ok',minOffer,occB,sb}; }
-M.whatif={key:'whatif',label:'دراسة وتحليل الفرصة',icon:'🔍',group:'الرئيسية',render(v){
+M.whatif={key:'whatif',label:'مدار تحليل الفرص',icon:'🔍',group:'المدارات',render(v){
   const st=WIView, {S,v:val,sv}=wiVals(), D=wiDecide(val), A=wiAdvice(D,S), R=D.R;
   const Q=WI_FD.filter(f=>f.g==='q'); if(st.step===undefined) st.step=sv.done?null:0;
   const toolbar=`<div class="toolbar wctr"><span class="wlead">حلّل أي مشروع جديد: أجب عن الأسئلة، ويقترح لك طريقة التشغيل الأنسب وأرقامها.</span><span class="sp"></span><button class="btn sm" id="wiReset">↺ دراسة مشروع جديد</button></div>`;
@@ -1864,7 +1867,7 @@ function npCreate(a,model){ const all=Store.coll('assets'), yr=new Date().getFul
   Store.data.assets=[P,...B,...U,...all];
   const alloc=Store.coll('contracts').find(k=>k.type==='تخصيص'), start=a.start||todayStr(), end=(()=>{ const d=new Date(start); d.setFullYear(d.getFullYear()+Math.round(a.years||10)); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); })();
   const pre=self?'SELF':'INV'; let cnt=Store.coll('contracts').filter(k=>String(k.number||'').startsWith(`${pre}-${yr}`)).length+1; while(Store.coll('contracts').some(k=>k.number===`${pre}-${yr}-${String(cnt).padStart(2,'0')}`)) cnt++;
-  const K=Store.add('contracts',{number:`${pre}-${yr}-${String(cnt).padStart(2,'0')}`,type:self?'تشغيل ذاتي':'مستثمر',title:self?`اتفاقية تشغيل ذاتي لـ${a.name}`:`عقد تشغيل ${a.name} مع مستثمر`,party:self?'الهيئة الملكية':(a.investor||'مستثمر'),assetId:P.id,parentId:alloc?.id||'',start,end,value:Math.round((self?(a.auth||0):(a.offer||0))*Math.round(a.years||10)),payToAuthority:Number(a.auth)||0,payFromInvestor:self?0:(Number(a.offer)||0),investment:Number(a.inv)||0,period:'سنوي',scope:self?`نحن المسؤولون: تأجير ${U.length} وحدة وتحصيلها وصيانتها`:'التشغيل الكامل: التأجير والتحصيل والصيانة وإدارة المرافق',status:'ساري',renewal:'يحتاج قرار'});
+  const K=Store.add('contracts',{city:App.city||'yanbu',number:`${pre}-${yr}-${String(cnt).padStart(2,'0')}`,type:self?'تشغيل ذاتي':'مستثمر',title:self?`اتفاقية تشغيل ذاتي لـ${a.name}`:`عقد تشغيل ${a.name} مع مستثمر`,party:self?'الهيئة الملكية':(a.investor||'مستثمر'),assetId:P.id,parentId:alloc?.id||'',start,end,value:Math.round((self?(a.auth||0):(a.offer||0))*Math.round(a.years||10)),payToAuthority:Number(a.auth)||0,payFromInvestor:self?0:(Number(a.offer)||0),investment:Number(a.inv)||0,period:'سنوي',scope:self?`نحن المسؤولون: تأجير ${U.length} وحدة وتحصيلها وصيانتها`:'التشغيل الكامل: التأجير والتحصيل والصيانة وإدارة المرافق',status:'ساري',renewal:'يحتاج قرار'});
   if(self){ const g=id=>npVal(a,NP_STEPS.find(x=>x.id===id)), mode=a.omMode||'new'; K.opsPerUnit=(Number(g('opsM'))||0)*12;
     if(mode==='link'&&a.omLink) K.omLinkId=a.omLink;
     if(mode==='new'&&Number(g('omM'))>0){ const on=Store.coll('contracts').filter(x=>String(x.number||'').startsWith(`OM-${yr}`)).length+1; let c=on; while(Store.coll('contracts').some(x=>x.number===`OM-${yr}-${String(c).padStart(2,'0')}`)) c++;
@@ -1993,12 +1996,12 @@ M.system={key:'system',label:'الإعدادات والنسخ',icon:'⚙️',gro
 }};
 
 /* ───────────────────────── App / Router ───────────────────────── */
-const NAV_ORDER=['dashboard','whatif','cashflow','agreements','alerts','operations','investor','assets','documents','contracts','finance','users','reports','gis','system'];
+const NAV_ORDER=['home','c_jubail','c_yanbu','c_jazan','c_raskhair','bookings','whatif','auctions','partners','dashboard','cashflow','agreements','alerts','operations','investor','assets','documents','contracts','finance','users','reports','gis','system'];
 const App={
   user:null,
   /* جهاز بلا رابط خاص: لا تُعرض بيانات تجريبية. يُطلب الرابط مرة واحدة ثم يُحفظ في هذا المتصفح */
   lock(){ document.body.innerHTML=`<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--bg,#f3f1ec);font-family:Tajawal,sans-serif" dir="rtl"><div class="card" style="max-width:460px;width:100%;text-align:center;padding:28px">
-      <h2 style="margin:0 0 6px">مدار الأصول</h2><p class="muted" style="margin:0 0 18px">هذا الجهاز غير مربوط ببيانات الشركة بعد.</p>
+      <h2 style="margin:0 0 6px">مدار مشروعات</h2><p class="muted" style="margin:0 0 18px">هذا الجهاز غير مربوط ببيانات الشركة بعد.</p>
       <p style="margin:0 0 10px;text-align:right">الصق الرابط الخاص الذي وصلك مرة واحدة فقط، وبعدها يفتح الموقع مباشرة من هذا الجهاز.</p>
       <input id="lkIn" placeholder="الصق الرابط الخاص هنا" style="width:100%;direction:ltr;text-align:left" autocomplete="off">
       <div id="lkMsg" class="small" style="color:#b23b2e;min-height:20px;margin:8px 0"></div>
@@ -2030,7 +2033,7 @@ const App={
     this.buildNav(); window.addEventListener('hashchange',()=>this.render()); this.render();
   },
   buildNav(){
-    let html=`<div class="brand"><div class="mark">${MADAR_MARK}</div><div><h1>مدار الأصول<small>منصة إدارة الأصول العقارية</small></h1></div></div></div>`; let g='';
+    let html=`<div class="brand"><div class="mark">${MADAR_MARK}</div><div><h1>مدار مشروعات<small>للتطوير العقاري</small></h1></div></div></div>`; let g='';
     NAV_ORDER.forEach(k=>{ const m=M[k]; if(m.group!==g){ g=m.group; html+=`<div class="group">${g}</div>`; } html+=`<a class="item" href="#${k}" data-k="${k}"><span class="ic">${m.icon}</span>${m.label}<span class="badge hidden" data-b="${k}"></span></a>`; });
     $('#nav').innerHTML=html; this.refreshBadges();
     $('#nav').onclick=e=>{ const it=e.target.closest('a.item'); if(!it) return; if(innerWidth>900) document.querySelector('.app').classList.add('nav-off'); if(it.dataset.k==='whatif'){ WIView.step=0; if(location.hash==='#whatif') App.render(); } };
@@ -2042,9 +2045,9 @@ const App={
   },
   render(){
     Charts.destroy(); Modal.close();
-    const h=location.hash.replace(/^#\/?/,'').replace(/^asset\//,'asset-')||'dashboard';
+    const h=location.hash.replace(/^#\/?/,'').replace(/^asset\//,'asset-')||'home';
     if(h.startsWith('asset-')){ const a=Store.get('assets',h.slice(6)); M.assets.render($('#view')); if(a) assetDetail(a); this.setTitle('assets'); return; }
-    const m=M[h]||M.dashboard; this.setTitle(m.key); m.render($('#view')); window.scrollTo(0,0); $('#nav').classList.remove('open');
+    const m=M[h]||M.home||M.dashboard; this.setTitle(m.key); m.render($('#view')); window.scrollTo(0,0); $('#nav').classList.remove('open');
   },
   setTitle(k){ $('#pageTitle').textContent=M[k].label; document.querySelectorAll('.nav .item').forEach(a=>a.classList.toggle('active',a.dataset.k===k)); }
 };
